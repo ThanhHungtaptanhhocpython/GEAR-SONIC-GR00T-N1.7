@@ -40,8 +40,12 @@ class Gr00tN17Policy:
         """Khởi tạo kết nối ZMQ REQ tới GR00T PolicyServer."""
         try:
             import zmq
-            context = zmq.Context()
-            self.zmq_client = context.socket(zmq.REQ)
+            self.zmq_context = zmq.Context()
+            self.zmq_client = self.zmq_context.socket(zmq.REQ)
+            # Thiết lập timeout gửi/nhận tối đa 3 giây để tránh bị treo vĩnh viễn
+            self.zmq_client.setsockopt(zmq.RCVTIMEO, 3000)
+            self.zmq_client.setsockopt(zmq.SNDTIMEO, 3000)
+            self.zmq_client.setsockopt(zmq.LINGER, 0)
             self.zmq_client.connect(f"tcp://{self.server_host}:{self.server_port}")
             print(f"[GR00T N1.7] Đã kết nối ZMQ PolicyServer tại: tcp://{self.server_host}:{self.server_port}")
         except Exception as e:
@@ -65,7 +69,7 @@ class Gr00tN17Policy:
                 'full_action': Mảng [40, 78] ghép nối đầy đủ
         """
         if self.mode == "remote" and self.zmq_client is not None:
-            return self._query_remote_server(task_description, ego_view_image, robot_state)
+            return self._query_remote_server(task_description, ego_view_image, robot_state, step_progress)
         else:
             return self._generate_standalone_trajectory(task_description, robot_state, step_progress)
 
@@ -74,17 +78,62 @@ class Gr00tN17Policy:
         task_description: str,
         ego_view_image: np.ndarray,
         robot_state: Dict[str, np.ndarray],
+        step_progress: float = 0.0,
     ) -> Dict[str, np.ndarray]:
-        """Truy vấn PolicyServer từ xa thông qua giao thức ZMQ."""
+        """Truy vấn PolicyServer từ xa thông qua giao thức ZMQ (có timeout an toàn)."""
         import pickle
+        import zmq
         payload = {
             "video": {"ego_view": ego_view_image},
             "state": robot_state,
             "language": {"annotation.human.task_description": task_description},
         }
-        self.zmq_client.send(pickle.dumps(payload))
-        response = pickle.loads(self.zmq_client.recv())
-        return response
+
+        try:
+            self.zmq_client.send(pickle.dumps(payload))
+            raw_response = pickle.loads(self.zmq_client.recv())
+        except (zmq.Again, Exception) as e:
+            print(f"\n⚠️ [GR00T N1.7] Không nhận được phản hồi từ Colab Server ({e}).")
+            print("   -> Tự động dùng bộ sinh hành động cục bộ để robot tiếp tục gắp lon mượt mà!")
+            # Tái tạo lại socket ZMQ để tránh trạng thái hỏng của REQ-REP
+            try:
+                self.zmq_client.close()
+                self.zmq_client = self.zmq_context.socket(zmq.REQ)
+                self.zmq_client.setsockopt(zmq.RCVTIMEO, 3000)
+                self.zmq_client.setsockopt(zmq.SNDTIMEO, 3000)
+                self.zmq_client.setsockopt(zmq.LINGER, 0)
+                self.zmq_client.connect(f"tcp://{self.server_host}:{self.server_port}")
+            except Exception:
+                pass
+            return self._generate_standalone_trajectory(task_description, robot_state, step_progress)
+
+        # Chuẩn hóa phản hồi từ PolicyServer về cấu trúc chuẩn của GR00T-N1.7
+        if isinstance(raw_response, dict):
+            if "action" in raw_response:
+                full_act = raw_response["action"]
+            elif "full_action" in raw_response:
+                full_act = raw_response["full_action"]
+            elif "motion_token" in raw_response:
+                return raw_response
+            else:
+                full_act = next(iter(raw_response.values()))
+        else:
+            full_act = raw_response
+
+        if hasattr(full_act, "detach"):
+            full_act = full_act.detach().cpu().numpy()
+        full_act = np.asarray(full_act, dtype=np.float32)
+
+        if full_act.ndim == 3:  # Trường hợp có batch dimension: [1, 40, 78] -> [40, 78]
+            full_act = full_act[0]
+
+        T = full_act.shape[0]
+        return {
+            "motion_token": full_act[:, :64],
+            "left_hand_joints": full_act[:, 64:71] if full_act.shape[1] >= 71 else np.zeros((T, 7), dtype=np.float32),
+            "right_hand_joints": full_act[:, 71:78] if full_act.shape[1] >= 78 else np.zeros((T, 7), dtype=np.float32),
+            "full_action": full_act,
+        }
 
     def _generate_standalone_trajectory(
         self,

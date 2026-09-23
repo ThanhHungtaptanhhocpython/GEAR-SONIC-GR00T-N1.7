@@ -4,9 +4,15 @@ Tác vụ: Robot G1 phân loại Lon Coca-Cola và Pepsi vào hai khay chuyên b
 Tích hợp camera ego_view góc nhìn robot (448x672) và trích xuất sensor phục vụ GR00T N1.7 VLA.
 """
 
+import os
 from pathlib import Path
 import time
 from typing import Dict, Optional, Tuple, Any
+
+# Cấu hình backend OpenGL offscreen mặc định là EGL nếu chưa được chỉ định
+if "MUJOCO_GL" not in os.environ:
+    os.environ["MUJOCO_GL"] = "egl"
+
 import mujoco
 import numpy as np
 
@@ -56,8 +62,11 @@ class G1CanSortingSim:
         self.coke_adr = self.model.jnt_qposadr[self.coke_jid]
         self.pepsi_adr = self.model.jnt_qposadr[self.pepsi_jid]
 
-        # Khớp floating base của robot pelvis
+        # Khớp floating base và sensor của robot pelvis
         self.pelvis_bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
+        self.pelvis_gyro_sid = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_SENSOR, "imu-pelvis-angular-velocity"
+        )
 
         # Lưu tư thế đứng mặc định
         self.stand_key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "stand")
@@ -104,6 +113,24 @@ class G1CanSortingSim:
         # 43 giá trị vị trí khớp điều khiển
         ctrl_qpos = self.data.qpos[7:50].copy()  # Bỏ qua 7 dof floating base (pos + quat)
 
+        # Trích xuất vận tốc góc từ Gyro Pelvis (rad/s)
+        if hasattr(self, "pelvis_gyro_sid") and self.pelvis_gyro_sid >= 0:
+            adr = self.model.sensor_adr[self.pelvis_gyro_sid]
+            base_ang_vel = self.data.sensordata[adr : adr + 3].copy().astype(np.float32)
+        else:
+            base_ang_vel = self.data.qvel[3:6].copy().astype(np.float32)
+
+        # 43 giá trị vận tốc khớp
+        ctrl_qvel = self.data.qvel[6:49].copy().astype(np.float32)
+        body_joint_indices = [
+            0, 1, 2, 3, 4, 5,       # left leg
+            6, 7, 8, 9, 10, 11,     # right leg
+            12, 13, 14,             # waist
+            15, 16, 17, 18, 19, 20, 21,  # left arm
+            29, 30, 31, 32, 33, 34, 35   # right arm
+        ]
+        body_joint_vel = ctrl_qvel[body_joint_indices]
+
         state_dict = {
             "left_leg": ctrl_qpos[self.JOINT_GROUPS["left_leg"]].astype(np.float32),
             "right_leg": ctrl_qpos[self.JOINT_GROUPS["right_leg"]].astype(np.float32),
@@ -113,6 +140,9 @@ class G1CanSortingSim:
             "left_hand": ctrl_qpos[self.JOINT_GROUPS["left_hand"]].astype(np.float32),
             "right_hand": ctrl_qpos[self.JOINT_GROUPS["right_hand"]].astype(np.float32),
             "projected_gravity": self.get_projected_gravity(),
+            "base_ang_vel": base_ang_vel,
+            "ctrl_qvel": ctrl_qvel,
+            "body_joint_vel": body_joint_vel,
         }
         return state_dict
 
@@ -157,4 +187,7 @@ class G1CanSortingSim:
 
     def close(self):
         """Giải phóng tài nguyên."""
-        self.renderer.close()
+        try:
+            self.renderer.close()
+        except Exception:
+            pass

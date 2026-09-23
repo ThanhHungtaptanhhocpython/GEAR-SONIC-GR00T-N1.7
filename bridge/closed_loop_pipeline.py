@@ -22,7 +22,10 @@ class ClosedLoopVLAPipeline:
         self,
         task_prompt: str = "Pick up the Coca-Cola can and place it in the red tray",
         policy_mode: str = "standalone",
+        server_host: str = "localhost",
+        server_port: int = 5550,
         wbc_smoothing: float = 0.35,
+        wbc_mode: str = "kinematic",
         substeps_per_wbc: int = 10,
         policy_replan_interval: int = 15,  # Số bước WBC (50Hz) giữa các lần gọi VLA (15 bước = 0.3s ~ 3.33Hz)
     ):
@@ -37,10 +40,15 @@ class ClosedLoopVLAPipeline:
         self.wbc = SonicWBCController(
             default_stand_ctrl=self.sim.default_ctrl,
             smoothing_alpha=wbc_smoothing,
+            mode=wbc_mode,
         )
 
         # 3. Khởi tạo mô hình VLA Policy GR00T N1.7
-        self.policy = Gr00tN17Policy(mode=policy_mode)
+        self.policy = Gr00tN17Policy(
+            mode=policy_mode,
+            server_host=server_host,
+            server_port=server_port,
+        )
 
         # Trạng thái vòng lặp
         self.current_action_chunk: Optional[Dict[str, np.ndarray]] = None
