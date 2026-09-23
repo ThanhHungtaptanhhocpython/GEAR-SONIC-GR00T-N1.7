@@ -7,6 +7,7 @@ Kiểm tra:
 4. Bộ giải mã GEAR-SONIC WBC giải mã 64-dim motion token thành 43 motor targets.
 5. VLA Policy GR00T N1.7 sinh Action Chunk [40, 78] cho cả 2 tác vụ Coke và Pepsi.
 6. Chạy vòng lặp khép kín 100 bước (2 giây mô phỏng ở 50 Hz) mượt mà không lỗi.
+7. Adapter REAL_G1: state/action của model GR00T thật ánh xạ đúng actuator; notebook Colab khớp server.
 """
 
 import os
@@ -30,6 +31,7 @@ from sim.g1_scene import G1CanSortingSim
 from bridge.sonic_wbc_controller import SonicWBCController
 from bridge.gr00t_policy_client import Gr00tN17Policy
 from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
+from bridge.real_g1_adapter import RealG1Adapter
 
 
 def test_mujoco_scene():
@@ -101,6 +103,18 @@ def test_gr00t_policy():
     )
     assert res_pepsi["full_action"].shape == (40, 78)
     print(f"  -> Dự đoán Action Chunk Pepsi OK: shape {res_pepsi['full_action'].shape}")
+
+    # 3. Bản sao quỹ đạo mẫu trong colab_gr00t_server.py phải khớp với client
+    import colab_gr00t_server
+    from bridge.gr00t_policy_client import scripted_sorting_chunk
+    for prompt in ("Pick up the Coca-Cola can and place it in the red tray",
+                   "Pick up the Pepsi can and place it in the blue tray"):
+        for progress in (0.0, 0.37, 0.95):
+            assert np.allclose(
+                colab_gr00t_server.scripted_sorting_chunk(prompt, progress, 40, Gr00tN17Policy.CYCLE_STEPS),
+                scripted_sorting_chunk(prompt, progress, 40, Gr00tN17Policy.CYCLE_STEPS),
+            ), "Quỹ đạo mẫu của colab_gr00t_server.py đã lệch so với bridge/gr00t_policy_client.py"
+    print("  -> Quỹ đạo mẫu của Colab server khớp với client")
     print("  -> TEST 3 PASSED!")
 
 
@@ -128,6 +142,47 @@ def test_closed_loop_pipeline():
     print("  -> TEST 4 PASSED!")
 
 
+def test_real_g1_adapter():
+    print("\n[TEST 5] Kiểm tra adapter REAL_G1 cho model GR00T thật...")
+    sim = G1CanSortingSim()
+    adapter = RealG1Adapter(sim.model)
+    state = adapter.state(sim.data, sim.act_qposadr)
+
+    dims = {k: len(v) for k, v in state.items()}
+    expected = {"left_wrist_eef_9d": 9, "right_wrist_eef_9d": 9, "left_hand": 7, "right_hand": 7,
+                "left_arm": 7, "right_arm": 7, "waist": 3}
+    assert dims == expected, f"Sai số chiều state REAL_G1: {dims}"
+    assert all(v.dtype == np.float32 for v in state.values())
+
+    # Action tuyệt đối bằng đúng state hiện tại phải cho lại góc khớp hiện tại ở mọi actuator tay/bàn tay/eo
+    horizon = 40
+    action = {k: np.repeat(v[None], horizon, axis=0) for k, v in state.items() if "eef" not in k}
+    ctrl = adapter.action_to_ctrl(action, sim.default_ctrl, action_hz=20.0, control_hz=50.0)
+    assert ctrl.shape == (98, 43), f"Sai shape chunk sau nội suy: {ctrl.shape}"
+    q = sim.data.qpos[sim.act_qposadr]
+    assert np.allclose(ctrl[:, 12:], q[12:], atol=1e-5), "Ánh xạ state -> actuator của REAL_G1 bị lệch"
+    assert np.allclose(ctrl[:, :12], sim.default_ctrl[:12]), "Chân phải giữ tư thế đứng mặc định"
+    # Dữ liệu REAL_G1 xếp khớp bàn tay theo alphabet: chiều 0 là index_0
+    assert sim.model.actuator(int(adapter.hand_idx["right"][0])).name == "right_hand_index_0_joint"
+    print(f"  -> State REAL_G1 OK: {dims}")
+    print(f"  -> Action chunk [40 @ 20 Hz] -> {ctrl.shape} @ 50 Hz, ánh xạ actuator khớp")
+    sim.close()
+
+    # Cell %%writefile trong các notebook Colab phải khớp với file gốc trong repo
+    import json
+    for notebook, source in (("colab_gr00t_server.ipynb", "colab_gr00t_server.py"),
+                             ("colab_gr00t_finetune.ipynb", "finetune/g1_can_sort_config.py")):
+        nb = json.load(open(os.path.join(ROOT_DIR, notebook), encoding="utf-8"))
+        src = open(os.path.join(ROOT_DIR, source), encoding="utf-8").read()
+        cells = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+        writefile = [c.split("\n", 1)[1] for c in cells if c.startswith("%%writefile")]
+        assert writefile and writefile[0].rstrip("\n") == src.rstrip("\n"), (
+            f"Cell %%writefile trong {notebook} đã lệch so với {source}: chạy tools/build_colab_notebooks.py"
+        )
+        print(f"  -> {notebook} khớp với {source}")
+    print("  -> TEST 5 PASSED!")
+
+
 def main():
     print("=" * 65)
     print("  BẮT ĐẦU KIỂM THỬ TỰ ĐỘNG HỆ THỐNG GEAR-SONIC-GR00T-N1.7")
@@ -137,6 +192,7 @@ def main():
     test_sonic_wbc()
     test_gr00t_policy()
     test_closed_loop_pipeline()
+    test_real_g1_adapter()
     
     print("\n" + "=" * 65)
     print("  TẤT CẢ CÁC BÀI KIỂM THỬ ĐÃ VƯỢT QUA 100% (ALL TESTS PASSED)!")

@@ -51,26 +51,26 @@
 
     <!-- ==================== VẬT THỂ PHÂN LOẠI ==================== -->
     
-    <!-- 1. Lon Coca-Cola (Bên tay phải robot: Y = -0.12) -->
-    <body name="coke_can" pos="0.42 -0.12 0.745">
+    <!-- 1. Lon Coca-Cola (Bên tay phải robot: Y = -0.14) -->
+    <body name="coke_can" pos="0.36 -0.14 0.745">
       <freejoint name="coke_joint"/>
       <!-- Thân lon Coke tiêu chuẩn: bán kính 33mm, cao 122mm -->
-      <geom name="coke_body" type="cylinder" size="0.033 0.058" material="coke_mat" mass="0.2" friction="1.2 0.01 0.001"/>
+      <geom name="coke_body" type="cylinder" size="0.033 0.058" material="coke_mat" mass="0.2" friction="1.5 0.05 0.005"/>
       <geom name="coke_top" type="cylinder" pos="0 0 0.059" size="0.031 0.002" material="can_lid_mat"/>
     </body>
 
-    <!-- 2. Lon Pepsi (Bên tay trái robot: Y = +0.12) -->
-    <body name="pepsi_can" pos="0.42 0.12 0.745">
+    <!-- 2. Lon Pepsi (Bên tay trái robot: Y = +0.14) -->
+    <body name="pepsi_can" pos="0.36 0.14 0.745">
       <freejoint name="pepsi_joint"/>
       <!-- Thân lon Pepsi -->
-      <geom name="pepsi_body" type="cylinder" size="0.033 0.058" material="pepsi_mat" mass="0.2" friction="1.2 0.01 0.001"/>
+      <geom name="pepsi_body" type="cylinder" size="0.033 0.058" material="pepsi_mat" mass="0.2" friction="1.5 0.05 0.005"/>
       <geom name="pepsi_top" type="cylinder" pos="0 0 0.059" size="0.031 0.002" material="can_lid_mat"/>
     </body>
 
     <!-- ==================== KHAY PHÂN LOẠI ==================== -->
 
     <!-- Khay chứa Coca-Cola (Bên phải bàn: Y = -0.32) -->
-    <body name="coke_tray" pos="0.45 -0.32 0.685">
+    <body name="coke_tray" pos="0.40 -0.32 0.685">
       <geom name="coke_tray_base" type="box" size="0.10 0.10 0.005" material="coke_tray_mat"/>
       <geom type="box" pos=" 0.095 0 0.015" size="0.005 0.10 0.015" rgba="0.9 0.2 0.2 0.8"/>
       <geom type="box" pos="-0.095 0 0.015" size="0.005 0.10 0.015" rgba="0.9 0.2 0.2 0.8"/>
@@ -79,7 +79,7 @@
     </body>
 
     <!-- Khay chứa Pepsi (Bên trái bàn: Y = +0.32) -->
-    <body name="pepsi_tray" pos="0.45 0.32 0.685">
+    <body name="pepsi_tray" pos="0.40 0.32 0.685">
       <geom name="pepsi_tray_base" type="box" size="0.10 0.10 0.005" material="pepsi_tray_mat"/>
       <geom type="box" pos=" 0.095 0 0.015" size="0.005 0.10 0.015" rgba="0.2 0.4 0.9 0.8"/>
       <geom type="box" pos="-0.095 0 0.015" size="0.005 0.10 0.015" rgba="0.2 0.4 0.9 0.8"/>
@@ -88,4 +88,19 @@
     </body>
 
   </worldbody>
+  <!-- Kẹp giữ lon khi gắp: weld cổ tay-lon chỉ bật lúc gắp (G1CanSortingSim ghi relpose tại thời điểm gắp) -->
+  <equality>
+    <weld name="coke_grasp" body1="right_wrist_yaw_link" body2="coke_can" active="false"/>
+    <weld name="pepsi_grasp" body1="left_wrist_yaw_link" body2="pepsi_can" active="false"/>
+  </equality>
+
+  <!-- Tư thế sẵn sàng thao tác bàn (Ready Stance above Table): nguồn duy nhất cho tư thế ready.
+       Chỉ khai báo ctrl; G1CanSortingSim.reset() suy ra qpos khớp từ ctrl, còn pelvis và 2 lon lấy từ vị trí body. -->
+  <keyframe>
+    <key name="ready_table"
+      ctrl="0 0 0 0 0 0  0 0 0 0 0 0  0 0 0.12
+            -0.132 0.449 0.222 0.8 -0.549 -0.621 -0.903  0 0 0 0 0 0 0
+            -0.132 -0.449 -0.222 0.8 0.549 -0.621 0.903  0 0 0 0 0 0 0"/>
+  </keyframe>
+
 </mujoco>

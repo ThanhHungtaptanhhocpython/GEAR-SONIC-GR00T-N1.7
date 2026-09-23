@@ -35,6 +35,7 @@ if ROOT_DIR not in sys.path:
 import mujoco
 import mujoco.viewer
 from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
+from bridge.real_g1_adapter import DEFAULT_ACTION_HZ
 
 
 TASK_PROMPTS = {
@@ -110,6 +111,24 @@ def main():
         help="Lệnh SSH từ Colab/Tmate (Ví dụ: 'ssh xxx@nyc1.tmate.io'). Tự động mở đường hầm SSH và kết nối remote.",
     )
     parser.add_argument(
+        "--server-timeout-ms",
+        type=int,
+        default=5000,
+        help="Thời gian chờ tối đa một lần truy vấn PolicyServer (ms). Tăng lên nếu GPU Colab chậm (ví dụ T4).",
+    )
+    parser.add_argument(
+        "--vla-action-hz",
+        type=float,
+        default=DEFAULT_ACTION_HZ,
+        help="Tần số dữ liệu của action chunk từ model GR00T thật (REAL_G1); dùng để nội suy về 50 Hz.",
+    )
+    parser.add_argument(
+        "--record-vla",
+        type=str,
+        default=None,
+        help="Ghi state/action/ảnh của mỗi lần gọi model GR00T thật ra file .npz khi thoát (để phân tích).",
+    )
+    parser.add_argument(
         "--wbc-mode",
         type=str,
         default="kinematic",
@@ -166,6 +185,9 @@ def main():
         server_host=args.server_host,
         server_port=args.server_port,
         wbc_mode=args.wbc_mode,
+        vla_action_hz=args.vla_action_hz,
+        server_timeout_ms=args.server_timeout_ms,
+        record_vla_path=args.record_vla,
     )
 
     print("\n🎮 PHÍM NÓNG ĐIỀU KHIỂN TRONG CỬA SỔ 3D:")
@@ -177,18 +199,22 @@ def main():
     print("  [ESC]   : Thoát chương trình")
     print("  Chuột trái: Xoay 3D | Chuột phải: Di chuyển | Cuộn chuột: Phóng to/Thu nhỏ\n")
 
-    # Hàm callback xử lý phím bấm trong cửa sổ MuJoCo 3D Viewer
+    # Biến cờ hiệu điều khiển để đảm bảo Thread Safety tuyệt đối giữa GLFW thread và Simulation thread
+    pending_prompt = None
+    reset_requested = False
+    snapshot_requested = False
+
+    # Hàm callback xử lý phím bấm trong cửa sổ MuJoCo 3D Viewer (Chạy trên GLFW GUI thread)
     def key_callback(keycode: int):
+        nonlocal pending_prompt, reset_requested, snapshot_requested
         # Phím '1' (ASCII 49): Coca-Cola
         if keycode in (ord("1"), 49):
-            prompt = TASK_PROMPTS["1"]
-            pipeline.set_task_prompt(prompt)
-            print(f"\n👉 [PHÍM 1] ĐÃ CHUYỂN NHIỆM VỤ: '{prompt}'")
+            pending_prompt = TASK_PROMPTS["1"]
+            print(f"\n👉 [PHÍM 1] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
         # Phím '2' (ASCII 50): Pepsi
         elif keycode in (ord("2"), 50):
-            prompt = TASK_PROMPTS["2"]
-            pipeline.set_task_prompt(prompt)
-            print(f"\n👉 [PHÍM 2] ĐÃ CHUYỂN NHIỆM VỤ: '{prompt}'")
+            pending_prompt = TASK_PROMPTS["2"]
+            print(f"\n👉 [PHÍM 2] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
         # Phím SPACE (ASCII 32): Pause / Resume
         elif keycode in (ord(" "), 32):
             pipeline.is_paused = not pipeline.is_paused
@@ -196,11 +222,10 @@ def main():
             print(f"\n⏸️  [SPACE] Trạng thái mô phỏng: {st}")
         # Phím R / r (ASCII 82, 114): Reset
         elif keycode in (ord("r"), ord("R"), 82, 114):
-            pipeline.reset()
-            print(f"\n🔄 [PHÍM R] Đã reset môi trường robot và lon nước về vị trí ban đầu.")
+            reset_requested = True
         # Phím S / s (ASCII 83, 115): Chụp ảnh
         elif keycode in (ord("s"), ord("S"), 83, 115):
-            save_snapshots(pipeline.sim)
+            snapshot_requested = True
 
     model = pipeline.sim.model
     data = pipeline.sim.data
@@ -225,10 +250,26 @@ def main():
             while viewer.is_running():
                 step_start = time.time()
 
-                # Bước 1 chu kỳ 50 Hz (20 ms)
-                res = pipeline.step_50hz()
+                # viewer.lock() chỉ được giữ khi ghi vào MjData (reset, bước vật lý); suy luận policy,
+                # truy vấn ZMQ và render camera chạy ngoài lock để cửa sổ 3D không bị đứng hình.
+                if pending_prompt is not None:
+                    pipeline.set_task_prompt(pending_prompt)
+                    pending_prompt = None
 
-                # Đồng bộ giao diện 3D Viewer
+                if reset_requested:
+                    reset_requested = False
+                    with viewer.lock():
+                        pipeline.reset()
+                    print("\n🔄 [PHÍM R] Đã reset an toàn môi trường robot và lon nước về vị trí ban đầu.")
+
+                if snapshot_requested:
+                    snapshot_requested = False
+                    save_snapshots(pipeline.sim)
+
+                # Bước 1 chu kỳ 50 Hz (20 ms)
+                res = pipeline.step_50hz(physics_lock=viewer.lock)
+
+                # Đồng bộ hiển thị giao diện 3D Viewer
                 viewer.sync()
 
                 # In thông tin trạng thái định kỳ mỗi 1.0 giây

@@ -66,6 +66,23 @@ class SonicWBCController:
         "waist_pitch": (-0.52, 0.52),
     }
 
+    # Giới hạn 7 khớp mỗi bàn tay Dex3 theo thứ tự actuator (22-28 trái, 36-42 phải).
+    # Chiều gập ngón ngược dấu giữa hai tay, nên không thể clip chung một khoảng [0, x].
+    LEFT_HAND_LIMITS = np.array([
+        (-1.0472, 1.0472), (-0.724312, 1.0472), (0.0, 1.74533),   # thumb 0-2
+        (-1.5708, 0.0), (-1.74533, 0.0),                            # middle 0-1
+        (-1.5708, 0.0), (-1.74533, 0.0),                            # index 0-1
+    ], dtype=np.float32)
+    RIGHT_HAND_LIMITS = np.array([
+        (-1.0472, 1.0472), (-1.0472, 0.724312), (-1.74533, 0.0),   # thumb 0-2
+        (0.0, 1.5708), (0.0, 1.74533),                              # index 0-1
+        (0.0, 1.5708), (0.0, 1.74533),                              # middle 0-1
+    ], dtype=np.float32)
+
+    # Tư thế bàn tay khép ôm lon (rad); tay trái là ảnh gương của tay phải
+    RIGHT_HAND_CLOSED = np.array([0.0, -0.5, -0.6, 0.7, 0.7, 0.7, 0.7], dtype=np.float32)
+    LEFT_HAND_CLOSED = -RIGHT_HAND_CLOSED
+
     def __init__(
         self,
         default_stand_ctrl: Optional[np.ndarray] = None,
@@ -77,29 +94,23 @@ class SonicWBCController:
         """Khởi tạo SONIC WBC Controller.
         
         Args:
-            default_stand_ctrl: Mảng 43 phần tử biểu diễn tư thế đứng mặc định (stand keyframe).
+            default_stand_ctrl: Mảng 43 phần tử biểu diễn tư thế sẵn sàng; mặc định đọc từ keyframe của scene XML.
             onnx_model_path: Đường dẫn tới model_decoder.onnx nếu có.
             smoothing_alpha: Hệ số lọc thông thấp làm mịn tín hiệu điều khiển (0 < alpha <= 1).
             history_len: Độ dài cửa sổ lịch sử quan sát cho ONNX Decoder (chuẩn 10 frames).
             mode: 'kinematic' (đứng vững & vươn tay gắp lon chuẩn xác) hoặc 'onnx' (mạng nơ-ron GEAR-SONIC).
         """
         self.mode = mode.lower()
-        if default_stand_ctrl is not None:
-            self.default_ctrl = default_stand_ctrl.copy()
-        else:
-            # Tư thế đứng chuẩn của G1
-            self.default_ctrl = np.zeros(43, dtype=np.float32)
-            self.default_ctrl[15] = 0.2   # left_shoulder_pitch
-            self.default_ctrl[16] = 0.2   # left_shoulder_roll
-            self.default_ctrl[18] = 1.28  # left_elbow
-            self.default_ctrl[29] = 0.2   # right_shoulder_pitch
-            self.default_ctrl[30] = -0.2  # right_shoulder_roll
-            self.default_ctrl[32] = 1.28  # right_elbow
+        if default_stand_ctrl is None:
+            from sim.g1_scene import load_ready_ctrl
+            default_stand_ctrl = load_ready_ctrl()
+        self.default_ctrl = np.asarray(default_stand_ctrl, dtype=np.float32).copy()
 
         self.default_body_ctrl = self.default_ctrl[self.BODY_INDICES].copy()
         self.smoothing_alpha = smoothing_alpha
         self.history_len = history_len
         self.last_ctrl = self.default_ctrl.copy()
+        self.last_target = self.default_ctrl.copy()
 
         # Tự động tìm model_decoder.onnx nếu chưa chỉ định đường dẫn
         if onnx_model_path is None:
@@ -139,6 +150,7 @@ class SonicWBCController:
     def reset(self):
         """Đặt lại bộ lọc làm mịn và bộ đệm lịch sử về trạng thái mặc định."""
         self.last_ctrl = self.default_ctrl.copy()
+        self.last_target = self.default_ctrl.copy()
         self._init_history()
 
     def decode(
@@ -237,45 +249,58 @@ class SonicWBCController:
             waist_yaw_delta = 0.45 * np.clip(motion_token[12], -1.0, 1.0)
             waist_roll_delta = 0.15 * np.clip(motion_token[13], -1.0, 1.0)
             waist_pitch_delta = 0.25 * np.clip(motion_token[14], -1.0, 1.0)
-            target_ctrl[12] = np.clip(waist_yaw_delta, -0.6, 0.6)
-            target_ctrl[13] = np.clip(waist_roll_delta, -0.3, 0.3)
-            target_ctrl[14] = np.clip(waist_pitch_delta, -0.4, 0.4)
+            target_ctrl[12] = np.clip(self.default_ctrl[12] + waist_yaw_delta, -0.6, 0.6)
+            target_ctrl[13] = np.clip(self.default_ctrl[13] + waist_roll_delta, -0.3, 0.3)
+            target_ctrl[14] = np.clip(self.default_ctrl[14] + waist_pitch_delta, -0.2, 0.5)
 
-            # 3. Cánh tay trái
-            target_ctrl[15] = np.clip(0.2 + 0.9 * motion_token[15], -1.8, 1.5)
-            target_ctrl[16] = np.clip(0.2 + 0.6 * motion_token[16], -0.2, 1.8)
-            target_ctrl[17] = np.clip(0.0 + 0.8 * motion_token[17], -1.5, 1.5)
-            target_ctrl[18] = np.clip(1.28 + 0.8 * motion_token[18], 0.1, 2.0)
-            target_ctrl[19] = np.clip(0.0 + 1.2 * motion_token[19], -1.8, 1.8)
-            target_ctrl[20] = np.clip(0.0 + 0.7 * motion_token[20], -1.2, 1.2)
-            target_ctrl[21] = np.clip(0.0 + 0.7 * motion_token[21], -1.2, 1.2)
+            # 3-4. Hai cánh tay: token dùng quy ước đối xứng gương, cùng một token cho tay trái và tay phải
+            # sinh ra chuyển động đối xứng qua mặt phẳng dọc thân (roll/yaw vai của tay phải đảo dấu).
+            arm_gains = np.array([0.9, 0.6, 0.8, 0.8, 1.2, 0.7, 0.7], dtype=np.float32)
+            right_sign = np.array([1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+            left_lo = np.array([-1.8, -0.2, -1.5, 0.1, -1.8, -1.2, -1.2], dtype=np.float32)
+            left_hi = np.array([1.5, 1.8, 1.5, 2.0, 1.8, 1.2, 1.2], dtype=np.float32)
+            right_lo = np.array([-1.8, -1.8, -1.5, 0.1, -1.8, -1.2, -1.2], dtype=np.float32)
+            right_hi = np.array([1.5, 0.2, 1.5, 2.0, 1.8, 1.2, 1.2], dtype=np.float32)
 
-            # 4. Cánh tay phải
-            target_ctrl[29] = np.clip(0.2 + 0.9 * motion_token[22], -1.8, 1.5)
-            target_ctrl[30] = np.clip(-0.2 - 0.6 * motion_token[23], -1.8, 0.2)
-            target_ctrl[31] = np.clip(0.0 - 0.8 * motion_token[24], -1.5, 1.5)
-            target_ctrl[32] = np.clip(1.28 + 0.8 * motion_token[25], 0.1, 2.0)
-            target_ctrl[33] = np.clip(0.0 + 1.2 * motion_token[26], -1.8, 1.8)
-            target_ctrl[34] = np.clip(0.0 + 0.7 * motion_token[27], -1.2, 1.2)
-            target_ctrl[35] = np.clip(0.0 + 0.7 * motion_token[28], -1.2, 1.2)
+            target_ctrl[15:22] = np.clip(
+                self.default_ctrl[15:22] + arm_gains * motion_token[15:22], left_lo, left_hi
+            )
+            target_ctrl[29:36] = np.clip(
+                self.default_ctrl[29:36] + right_sign * arm_gains * motion_token[22:29], right_lo, right_hi
+            )
 
         # =========================================================================
         # 5. ĐIỀU KHIỂN BÀN TAY (DEXTEROUS HANDS: 7L + 7R)
         # =========================================================================
-        if left_hand_joints is not None and len(left_hand_joints) == 7:
-            target_ctrl[22:29] = np.clip(left_hand_joints, 0.0, 1.5)
-        else:
-            target_ctrl[22:29] = np.clip(0.6 * (motion_token[29:36] + 1.0), 0.0, 1.4)
+        if left_hand_joints is None or len(left_hand_joints) != 7:
+            # Không có góc khớp tay: token [-1, 1] -> độ khép [0, 1] của tư thế ôm lon
+            left_hand_joints = np.clip(0.5 * (motion_token[29:36] + 1.0), 0.0, 1.0) * self.LEFT_HAND_CLOSED
+        target_ctrl[22:29] = np.clip(left_hand_joints, self.LEFT_HAND_LIMITS[:, 0], self.LEFT_HAND_LIMITS[:, 1])
 
-        if right_hand_joints is not None and len(right_hand_joints) == 7:
-            target_ctrl[36:43] = np.clip(right_hand_joints, 0.0, 1.5)
-        else:
-            target_ctrl[36:43] = np.clip(0.6 * (motion_token[36:43] + 1.0), 0.0, 1.4)
+        if right_hand_joints is None or len(right_hand_joints) != 7:
+            right_hand_joints = np.clip(0.5 * (motion_token[36:43] + 1.0), 0.0, 1.0) * self.RIGHT_HAND_CLOSED
+        target_ctrl[36:43] = np.clip(right_hand_joints, self.RIGHT_HAND_LIMITS[:, 0], self.RIGHT_HAND_LIMITS[:, 1])
 
         # =========================================================================
         # 6. BỘ LỌC LÀM MỊN KHÔNG GIAN KHỚP (LOW-PASS FILTER / SMOOTHING)
         # =========================================================================
+        return self._smooth(target_ctrl)
+
+    def track_joint_targets(self, target_ctrl: np.ndarray) -> np.ndarray:
+        """Bám theo 43 góc khớp tuyệt đối do VLA xuất trực tiếp (embodiment REAL_G1, không qua motion token).
+
+        Chân giữ tư thế đứng mặc định vì embodiment này không điều khiển chân; bàn tay được clip theo giới hạn
+        Dex3 rồi toàn bộ đi qua cùng bộ lọc làm mịn với decode().
+        """
+        target_ctrl = np.asarray(target_ctrl, dtype=np.float32).copy()
+        target_ctrl[0:12] = self.default_ctrl[0:12]
+        target_ctrl[22:29] = np.clip(target_ctrl[22:29], self.LEFT_HAND_LIMITS[:, 0], self.LEFT_HAND_LIMITS[:, 1])
+        target_ctrl[36:43] = np.clip(target_ctrl[36:43], self.RIGHT_HAND_LIMITS[:, 0], self.RIGHT_HAND_LIMITS[:, 1])
+        return self._smooth(target_ctrl)
+
+    def _smooth(self, target_ctrl: np.ndarray) -> np.ndarray:
+        # Mục tiêu trước bộ lọc: là action ghi vào dataset demo, vì lúc chạy model action lại đi qua bộ lọc này
+        self.last_target = np.asarray(target_ctrl, dtype=np.float32).copy()
         smoothed_ctrl = (1.0 - self.smoothing_alpha) * self.last_ctrl + self.smoothing_alpha * target_ctrl
         self.last_ctrl = smoothed_ctrl.copy()
-
         return smoothed_ctrl.astype(np.float32)
