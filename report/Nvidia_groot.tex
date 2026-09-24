@@ -108,14 +108,18 @@ Thời gian & Tháng 9 năm 2026\\
 % =====================================================================
 %  ABSTRACT
 % =====================================================================
-\chapter*{TÓM TẮT}
-\addcontentsline{toc}{chapter}{Tóm tắt}
+\chapter*{GIỚI THIỆU}
+\addcontentsline{toc}{chapter}{Giới thiệu}
 
 GR00T N1.7 là mô hình Vision-Language-Action mã nguồn mở của NVIDIA, phát hành năm 2026, khoảng 3 tỉ tham số. Mô hình nhận ảnh camera, câu lệnh bằng lời và trạng thái khớp của robot, rồi trả về 40 bước hành động tiếp theo. Bên trong gồm hai khối: một khối VLM để hiểu ảnh và câu lệnh, một khối Diffusion Transformer để sinh hành động. Với robot hình người, mô hình không điều khiển trực tiếp từng khớp mà đưa ra một token chuyển động 64 chiều, rồi bộ điều khiển toàn thân GEAR-SONIC giải mã token này thành lệnh cho 29 khớp ở 50\,Hz và tự lo giữ thăng bằng. Báo cáo cũng trình bày chi tiết GEAR-SONIC: kiến trúc điều khiển ba lớp, Universal Token, cách huấn luyện trên dữ liệu Bones-SEED trong Isaac Lab và cách triển khai trên robot thật.
 
-Báo cáo trình bày cách mô hình hoạt động ở mức các tầng chính, không đi sâu vào toán; so sánh GR00T N1.7 với $\pi_{0.5}$ và các mô hình cùng loại; chỉ ra điểm mạnh, điểm chưa ổn, và vì sao cách tiếp cận này tốt hơn policy lập trình sẵn hay policy học một nhiệm vụ. Phần kết quả ghi lại ba việc nhóm đã làm: nối GR00T N1.7 với bộ điều khiển toàn thân trên mô phỏng MuJoCo của Unitree G1; tự sinh dữ liệu demo cho nhiệm vụ phân loại lon Coca-Cola và Pepsi; và fine-tune mô hình trên Google Colab. Kết quả open-loop trên 40 episode kiểm tra cho sai số MAE 0,0053 theo đơn vị chuẩn hoá, tương đương khoảng 0,3 độ, chênh lệch train-test khoảng 3\%. Thử nghiệm closed-loop và mở rộng dữ liệu là việc đang làm tiếp.
+Báo cáo tập trung nghiên cứu kiến trúc, nguyên lý hoạt động và khả năng ứng dụng của mô hình NVIDIA GR00T N1.7 kết hợp với GEAR-SONIC trong bài toán điều khiển robot. Nội dung nghiên cứu bao gồm phân tích các thành phần chính trong kiến trúc mô hình, cơ chế xử lý thông tin và sinh hành động, cũng như những ưu điểm, hạn chế của phương pháp tiếp cận này so với các phương pháp điều khiển dựa trên policy được lập trình sẵn hoặc policy được huấn luyện cho một tác vụ cụ thể.
 
-\noindent\textbf{Từ khoá:} \textit{Vision-Language-Action, GR00T N1.7, Diffusion Transformer, whole-body control, GEAR-SONIC, Unitree G1, fine-tuning.}
+Bên cạnh việc tìm hiểu kiến trúc, báo cáo phân tích các phương pháp fine-tune mô hình nhằm thích ứng với từng bài toán và yêu cầu thực tế. Trọng tâm nghiên cứu bao gồm việc xác định các thành phần có thể tinh chỉnh, ảnh hưởng của quá trình fine-tune đến khả năng nhận thức và điều khiển của robot, cũng như yêu cầu về dữ liệu huấn luyện đối với NVIDIA GR00T N1.7 và GEAR-SONIC. Từ đó, báo cáo tìm hiểu quy trình thu thập, tiền xử lý và xây dựng dữ liệu phù hợp với kiến trúc mô hình và bài toán điều khiển toàn thân (Whole-Body Control).
+
+Về thực nghiệm, nhóm đã xây dựng bộ dữ liệu gồm 400 episode huấn luyện và 40 episode kiểm tra được tạo trong môi trường mô phỏng cho bài toán nhận biết và phân biệt lon Coca-Cola và Pepsi. Bộ dữ liệu này được sử dụng để fine-tune mô hình trên Google Colab. Kết quả đánh giá open-loop trên 40 episode kiểm tra cho thấy mô hình đạt sai số tuyệt đối trung bình (MAE) là 0,0189, với mức chênh lệch giữa kết quả trên tập huấn luyện và tập kiểm tra khoảng 27\%.
+
+Hiện tại, nhóm đang tiếp tục đánh giá mô hình trong chế độ closed-loop nhằm kiểm tra khả năng thực thi hành động và tương tác với môi trường, đồng thời mở rộng bộ dữ liệu để cải thiện khả năng tổng quát hóa. Các hướng nghiên cứu tiếp theo bao gồm thử nghiệm trên những bài toán thao tác vật thể khác và tiến tới đánh giá khả năng triển khai mô hình trên robot Unitree G1 trong môi trường thực tế.
 \clearpage
 
 % =====================================================================
@@ -192,11 +196,6 @@ LeRobot & Định dạng dataset robot của Hugging Face mà GR00T dùng.\\
 \setcounter{page}{1}
 
 % ---------------------------------------------------------------------
-\chapter{GIỚI THIỆU}
-% ---------------------------------------------------------------------
-\textcolor{gray}{\itshape [Phần này do tác giả tự viết. Gợi ý: bài toán của nhóm, lý do chọn GR00T N1.7, câu hỏi cần trả lời cho mentor, cấu trúc báo cáo.]}
-
-% ---------------------------------------------------------------------
 \chapter{CƠ SỞ LÝ THUYẾT}
 % ---------------------------------------------------------------------
 Chương này chỉ nêu bốn ý cần có để đọc chương~\ref{chap:arch} và~\ref{chap:data}.
@@ -216,10 +215,10 @@ Với tay máy, ghi hành động ở EEF dưới dạng relative action giúp m
 \section{Tổng quan các phiên bản GR00T và mô hình liên quan}
 
 \begin{itemize}
-\item \textbf{GR00T N1} (3/2025): VLA mở đầu tiên của NVIDIA cho robot hình người, 2,2 tỉ tham số.
-\item \textbf{GR00T N1.5} (6/2025): đóng băng backbone, nghe lệnh tốt hơn.
-\item \textbf{GR00T N1.6} (12/2025): backbone Eagle, DiT 32 lớp hỏi chữ và hỏi ảnh xen kẽ, chunk 16 bước.
-\item \textbf{GR00T N1.7} (bản thử nghiệm 4/2026, bản chính thức 7/2026): backbone Cosmos-Reason2-2B thay cho Eagle; relative action ở EEF chung cho người và robot; thêm 20 nghìn giờ video người EgoScale; chunk 40 bước; xuất toàn bộ pipeline sang ONNX, TensorRT; dùng thương mại được. Tag \code{UNITREE\_G1\_SONIC} để ghép với SONIC được bổ sung vào mã nguồn N1.7 từ 5/2026.
+\item GR00T N1, tháng 3/2025: VLA mở đầu tiên của NVIDIA cho robot hình người, 2,2 tỉ tham số.
+\item GR00T N1.5, tháng 6/2025: đóng băng backbone, nghe lệnh tốt hơn.
+\item GR00T N1.6, tháng 12/2025: backbone Eagle, DiT 32 lớp hỏi chữ và hỏi ảnh xen kẽ, chunk 16 bước.
+\item GR00T N1.7, bản thử nghiệm tháng 4/2026 và bản chính thức tháng 7/2026: backbone Cosmos-Reason2-2B thay cho Eagle; relative action ở EEF chung cho người và robot; thêm 20 nghìn giờ video người EgoScale; chunk 40 bước; xuất toàn bộ pipeline sang ONNX, TensorRT; dùng thương mại được. Tag \code{UNITREE\_G1\_SONIC} để ghép với SONIC được bổ sung vào mã nguồn N1.7 từ 5/2026.
 \end{itemize}
 
 Mô hình cùng loại: $\pi_0$, $\pi_{0.5}$ của Physical Intelligence, OpenVLA; về phía WBC là GEAR-SONIC của NVIDIA. Chương~\ref{chap:compare} so sánh.
@@ -246,11 +245,11 @@ Hệ thống của nhóm gồm hai mô hình độc lập ghép lại: GR00T N1.
 
 Hình~\ref{fig:arch} là toàn bộ GR00T N1.7 khi đứng riêng. Một lần suy luận đi qua năm bước:
 \begin{enumerate}
-\item \textbf{Đầu vào:} ảnh camera, có thể kèm một khung quá khứ; câu lệnh; trạng thái khớp của robot.
-\item \textbf{VLM:} ảnh và câu lệnh được biến thành một chuỗi vector 2048 chiều đã trộn thông tin ảnh với chữ.
-\item \textbf{Action head:} 40 token hành động bắt đầu là nhiễu, cùng 1 token trạng thái, đi qua DiT và hỏi thông tin từ chuỗi vector trên.
-\item \textbf{Khử nhiễu 4 lần:} sau mỗi lần, token hành động gần hành động thật hơn.
-\item \textbf{Đầu ra:} 40 bước hành động theo đơn vị thật, chia theo nhóm khớp của robot đang dùng.
+\item Đầu vào: ảnh camera, có thể kèm một khung quá khứ; câu lệnh; trạng thái khớp của robot.
+\item VLM: ảnh và câu lệnh được biến thành một chuỗi vector 2048 chiều đã trộn thông tin ảnh với chữ.
+\item Action head: 40 token hành động bắt đầu là nhiễu, cùng 1 token trạng thái, đi qua DiT và hỏi thông tin từ chuỗi vector trên.
+\item Khử nhiễu 4 lần: sau mỗi lần, token hành động gần hành động thật hơn.
+\item Đầu ra: 40 bước hành động theo đơn vị thật, chia theo nhóm khớp của robot đang dùng.
 \end{enumerate}
 Đầu ra là gì tuỳ cách khai báo embodiment: với tay máy là góc khớp hoặc pose EEF; với Unitree G1 theo khai báo \code{REAL\_G1} là pose hai cổ tay, góc cánh tay, bàn tay, eo, cùng lệnh chiều cao thân và lệnh di chuyển. Bảng~\ref{tab:hparams} liệt kê các con số chính.
 
@@ -331,9 +330,9 @@ SONIC là bộ điều khiển toàn thân cho Unitree G1 29 khớp, 42 triệu 
 
 Khi đứng riêng, pipeline của SONIC gồm ba khối:
 \begin{enumerate}
-\item \textbf{Bộ mã hoá:} nhận một lệnh chuyển động ở một trong ba dạng: chuyển động tham chiếu của robot, tư thế người từ VR hoặc video, hoặc lệnh lai gồm keypoint thân trên cộng chân robot. Mỗi dạng có một bộ mã hoá riêng, tất cả đổ về cùng một motion token 64 chiều.
-\item \textbf{Motion token:} vector 64 chiều mô tả ý định chuyển động của toàn thân trong khoảng 1 giây tới. Đây là ngôn ngữ chung của SONIC.
-\item \textbf{Bộ giải mã:} nhận token cùng trạng thái robot 10 bước gần nhất, trả về mục tiêu góc cho 29 khớp ở 50\,Hz. Bộ giải mã đã học giữ thăng bằng, nên mọi token đều cho ra chuyển động đứng vững.
+\item Bộ mã hoá: nhận một lệnh chuyển động ở một trong ba dạng: chuyển động tham chiếu của robot, tư thế người từ VR hoặc video, hoặc lệnh lai gồm keypoint thân trên cộng chân robot. Mỗi dạng có một bộ mã hoá riêng, tất cả đổ về cùng một motion token 64 chiều.
+\item Motion token: vector 64 chiều mô tả ý định chuyển động của toàn thân trong khoảng 1 giây tới. Đây là ngôn ngữ chung của SONIC.
+\item Bộ giải mã: nhận token cùng trạng thái robot 10 bước gần nhất, trả về mục tiêu góc cho 29 khớp ở 50\,Hz. Bộ giải mã đã học giữ thăng bằng, nên mọi token đều cho ra chuyển động đứng vững.
 \end{enumerate}
 Bộ giải mã chạy trên máy tính của robot, lệnh xuống động cơ ở 500\,Hz. Với 14 khớp ngón tay, SONIC không điều khiển; góc ngón đi thẳng xuống bàn tay.
 
@@ -346,7 +345,7 @@ Bộ giải mã chạy trên máy tính của robot, lệnh xuống động cơ 
 \label{fig:sonic_3layer}
 \end{figure}
 
-Nhìn theo tần số, SONIC tổ chức việc điều khiển thành ba lớp (Hình~\ref{fig:sonic_3layer}). Lớp thứ nhất gồm các bộ sinh chuyển động, chạy ở khoảng 2,5 đến 30\,Hz, có nhiệm vụ quyết định robot nên cử động như thế nào. Các nguồn ở lớp này gồm Kinematic Planner, kính VR, mô hình GEM và mô hình GR00T. Lớp thứ hai là không gian Universal Token, chạy ở 50\,Hz, nơi mọi nguồn chuyển động được dịch về một token chung. Lớp thứ ba lo việc giải mã và thực thi. Bộ giải mã điều khiển chạy ở 50\,Hz và xuất ra góc khớp mục tiêu $q^*$, sau đó bộ điều khiển PD trên bo mạch động cơ chạy ở 500\,Hz để biến góc mục tiêu thành lực quay thực tế.
+Nhìn theo tần số, SONIC tổ chức việc điều khiển thành ba lớp như Hình~\ref{fig:sonic_3layer}. Lớp thứ nhất gồm các bộ sinh chuyển động, chạy ở khoảng 2,5 đến 30\,Hz, có nhiệm vụ quyết định robot nên cử động như thế nào. Các nguồn ở lớp này gồm Kinematic Planner, kính VR, mô hình GEM và mô hình GR00T. Lớp thứ hai là không gian Universal Token, chạy ở 50\,Hz, nơi mọi nguồn chuyển động được dịch về một token chung. Lớp thứ ba lo việc giải mã và thực thi. Bộ giải mã điều khiển chạy ở 50\,Hz và xuất ra góc khớp mục tiêu $q^*$, sau đó bộ điều khiển PD trên bo mạch động cơ chạy ở 500\,Hz để biến góc mục tiêu thành lực quay thực tế.
 
 Công thức quan trọng nhất ở tầng thấp nhất là công thức của bộ điều khiển PD:
 \begin{equation}
@@ -373,7 +372,7 @@ Lý do SONIC chọn FSQ thay vì VQ-VAE nằm ở cách hai phương pháp tạo
 
 SONIC có hai bộ giải mã với vai trò rất khác nhau. Bộ giải mã hình học $\mathcal{D}_r$ chỉ nhận token và trả lời câu hỏi dáng này tương ứng với những góc khớp robot nào. Nó hoàn toàn không biết gì về vật lý: không biết robot đang nghiêng hay thẳng, cũng không biết chân có đang chạm đất hay không. Nếu đưa thẳng đầu ra của nó vào động cơ, robot sẽ ngã ngay. Vì vậy, $\mathcal{D}_r$ chỉ dùng để tính các hàm mất mát trong lúc huấn luyện và bị loại bỏ khi triển khai.
 
-Bộ giải mã điều khiển $\mathcal{D}_c$ mới là bộ điều khiển thực sự chạy trên robot. Nó nhận cả token lẫn dữ liệu cảm biến cơ thể, và nhờ được huấn luyện bằng PPO trong môi trường có trọng lực, quán tính và ma sát, nó học được cách đạt dáng mong muốn trong khi vẫn giữ thăng bằng. Đầu ra của $\mathcal{D}_c$ được gửi xuống bộ điều khiển PD ở tần số 50\,Hz. Trong Universal Control Policy, khối trung tâm của SONIC, $\mathcal{D}_c$ chính là mạng Actor của thuật toán học tăng cường (Mục~\ref{sec:sonic_train}).
+Bộ giải mã điều khiển $\mathcal{D}_c$ mới là bộ điều khiển thực sự chạy trên robot. Nó nhận cả token lẫn dữ liệu cảm biến cơ thể, và nhờ được huấn luyện bằng PPO trong môi trường có trọng lực, quán tính và ma sát, nó học được cách đạt dáng mong muốn trong khi vẫn giữ thăng bằng. Đầu ra của $\mathcal{D}_c$ được gửi xuống bộ điều khiển PD ở tần số 50\,Hz. Trong Universal Control Policy, khối trung tâm của SONIC, $\mathcal{D}_c$ chính là mạng Actor của thuật toán học tăng cường, trình bày ở Mục~\ref{sec:sonic_train}.
 
 \subsection{Kinematic Planner}
 \label{sec:sonic_sources}
@@ -404,10 +403,10 @@ GEM là mô hình nền tảng của NVIDIA~\cite{genmo} có khả năng sinh ch
 
 Trên robot thật, SONIC chạy trên máy tính Jetson Orin gắn trên robot, với bộ giải mã đã biên dịch sang TensorRT~\cite{tensorrt}. Hệ thống chạy bốn luồng song song với các tần số khác nhau:
 \begin{itemize}
-\item \textbf{Luồng đầu vào, 100\,Hz:} đọc tín hiệu từ tay cầm, bàn phím hoặc kính VR.
-\item \textbf{Luồng Kinematic Planner, 10\,Hz:} sinh quỹ đạo dài khoảng 2 giây, mỗi lần mất khoảng 12\,ms.
-\item \textbf{Luồng điều khiển, 50\,Hz:} chạy bộ mã hoá và policy, mỗi lần chỉ mất 1 đến 2\,ms nhờ TensorRT kết hợp với CUDA Graph.
-\item \textbf{Luồng ghi lệnh, 500\,Hz:} gửi góc mục tiêu xuống bo mạch động cơ.
+\item Luồng đầu vào, 100\,Hz: đọc tín hiệu từ tay cầm, bàn phím hoặc kính VR.
+\item Luồng Kinematic Planner, 10\,Hz: sinh quỹ đạo dài khoảng 2 giây, mỗi lần mất khoảng 12\,ms.
+\item Luồng điều khiển, 50\,Hz: chạy bộ mã hoá và policy, mỗi lần chỉ mất 1 đến 2\,ms nhờ TensorRT kết hợp với CUDA Graph.
+\item Luồng ghi lệnh, 500\,Hz: gửi góc mục tiêu xuống bo mạch động cơ.
 \end{itemize}
 Hệ thống cũng có một chế độ an toàn. Nếu mất tín hiệu hoặc phát hiện vận tốc khớp bất thường, hệ số $K_p$ trong~\eqref{eq:pd} được đặt về 0 và chỉ giữ lại thành phần giảm chấn với $K_d = 8$. Khi đó robot không còn cố giữ tư thế mà mềm ra và hạ xuống từ từ, tránh ngã mạnh gây hỏng khung cơ khí.
 
@@ -421,11 +420,11 @@ Hệ thống cũng có một chế độ an toàn. Nếu mất tín hiệu hoặ
 \label{fig:vla_sonic}
 \end{figure}
 
-Khi ghép, GR00T N1.7 thay thế các bộ mã hoá của SONIC: thay vì người điều khiển VR sinh ra motion token, VLA sinh ra motion token từ ảnh và câu lệnh. Hai hệ thống chia nhau trách nhiệm rõ ràng (Hình~\ref{fig:vla_sonic}): GR00T quyết định robot cần làm gì, ví dụ nhìn ảnh và hiểu câu lệnh nhặt chai nước; SONIC quyết định cách thực hiện ý định đó bằng cách tự điều phối trọng tâm, bước chân và tư thế để robot không bị ngã. Pipeline chung chạy ba tần số:
+Khi ghép, GR00T N1.7 thay thế các bộ mã hoá của SONIC: thay vì người điều khiển VR sinh ra motion token, VLA sinh ra motion token từ ảnh và câu lệnh. Hai hệ thống chia nhau trách nhiệm rõ ràng như Hình~\ref{fig:vla_sonic}: GR00T quyết định robot cần làm gì, ví dụ nhìn ảnh và hiểu câu lệnh nhặt chai nước; SONIC quyết định cách thực hiện ý định đó bằng cách tự điều phối trọng tâm, bước chân và tư thế để robot không bị ngã. Pipeline chung chạy ba tần số:
 \begin{enumerate}
-\item \textbf{GR00T N1.7, 2,5\,Hz:} nhận ảnh camera đầu, câu lệnh, trạng thái 46 chiều gồm chân, eo, tay, bàn tay và hướng trọng lực; trả về 40 bước, mỗi bước 78 chiều gồm motion token 64 chiều và 14 góc ngón tay.
-\item \textbf{Bộ giải mã SONIC, 50\,Hz:} lấy lần lượt từng token trong 40 bước, ghép với trạng thái robot, trả về mục tiêu góc cho 29 khớp thân. 14 góc ngón đi thẳng tới bàn tay.
-\item \textbf{Robot hoặc mô phỏng, 500\,Hz:} bộ điều khiển PD bám mục tiêu góc, trả lại trạng thái mới cho cả hai tầng.
+\item GR00T N1.7, 2,5\,Hz: nhận ảnh camera đầu, câu lệnh, trạng thái 46 chiều gồm chân, eo, tay, bàn tay và hướng trọng lực; trả về 40 bước, mỗi bước 78 chiều gồm motion token 64 chiều và 14 góc ngón tay.
+\item Bộ giải mã SONIC, 50\,Hz: lấy lần lượt từng token trong 40 bước, ghép với trạng thái robot, trả về mục tiêu góc cho 29 khớp thân. 14 góc ngón đi thẳng tới bàn tay.
+\item Robot hoặc mô phỏng, 500\,Hz: bộ điều khiển PD bám mục tiêu góc, trả lại trạng thái mới cho cả hai tầng.
 \end{enumerate}
 Vector hành động 78 chiều ở mỗi bước được chia như sau:
 \begin{equation}
@@ -503,7 +502,7 @@ Quy trình huấn luyện SONIC đi kèm repository, tương ứng giai đoạn 
 \label{fig:sonic_train}
 \end{figure}
 
-Khác với GR00T, SONIC không học bắt chước từ demo mà học bằng học tăng cường trong mô phỏng (Hình~\ref{fig:sonic_train}). Việc huấn luyện diễn ra trong Isaac Lab~\cite{isaaclab}, nơi 4.096 robot ảo tập luyện song song trên GPU. Hai kỹ thuật giúp quá trình này hiệu quả. Kỹ thuật thứ nhất là adaptive sampling: đoạn chuyển động nào khiến robot hay ngã sẽ được chọn để tập lại thường xuyên hơn, nhờ đó robot dành phần lớn thời gian cho các động tác khó như xoay người gắt, ngồi xổm sâu hay nhảy, thay vì lặp lại những động tác đã thành thạo. Kỹ thuật thứ hai là domain randomization: ma sát sàn được thay đổi trong khoảng 0,4 đến 1,2, khối lượng các chi dao động 10\%, robot bị đẩy bất ngờ với lực từ 20 đến 80\,N, và độ trễ cảm biến được đặt ngẫu nhiên từ 10 đến 30\,ms. Vì đã quen với một thế giới luôn thay đổi, bộ điều khiển không bị bất ngờ khi được đưa ra robot thật.
+Khác với GR00T, SONIC không học bắt chước từ demo mà học bằng học tăng cường trong mô phỏng theo Hình~\ref{fig:sonic_train}. Việc huấn luyện diễn ra trong Isaac Lab~\cite{isaaclab}, nơi 4.096 robot ảo tập luyện song song trên GPU. Hai kỹ thuật giúp quá trình này hiệu quả. Kỹ thuật thứ nhất là adaptive sampling: đoạn chuyển động nào khiến robot hay ngã sẽ được chọn để tập lại thường xuyên hơn, nhờ đó robot dành phần lớn thời gian cho các động tác khó như xoay người gắt, ngồi xổm sâu hay nhảy, thay vì lặp lại những động tác đã thành thạo. Kỹ thuật thứ hai là domain randomization: ma sát sàn được thay đổi trong khoảng 0,4 đến 1,2, khối lượng các chi dao động 10\%, robot bị đẩy bất ngờ với lực từ 20 đến 80\,N, và độ trễ cảm biến được đặt ngẫu nhiên từ 10 đến 30\,ms. Vì đã quen với một thế giới luôn thay đổi, bộ điều khiển không bị bất ngờ khi được đưa ra robot thật.
 
 Thuật toán học tăng cường được sử dụng là PPO~\cite{ppo} với hai mạng có quyền truy cập thông tin khác nhau~\cite{asymac}. Mạng Actor là mạng sẽ chạy trên robot thật, tức bộ giải mã điều khiển $\mathcal{D}_c$, vì vậy nó chỉ được thấy những gì robot thật có thể đo được: token 64 chiều cùng dữ liệu cảm biến của 10 khung hình gần nhất, bao gồm góc khớp, vận tốc khớp và cảm biến quán tính, tất cả đều có nhiễu. Mạng Critic chỉ tồn tại trong mô phỏng và được thấy đầy đủ các đại lượng vật lý thật như vận tốc thân, vị trí trọng tâm, lực tiếp xúc của bàn chân với sàn và hệ số ma sát. Có thể hình dung Critic như một huấn luyện viên có sẵn đáp án. Nhờ Critic chấm điểm chính xác, Actor học nhanh và vững hơn, dù bản thân Actor chỉ dựa vào cảm biến thông thường.
 
@@ -546,8 +545,8 @@ Phép làm tròn trong FSQ~\eqref{eq:fsq} lại có đạo hàm bằng 0, nghĩa
 
 Khi ghép với SONIC, chỉ đầu ra đổi: mỗi khung demo phải có nhãn hành động 78 chiều gồm motion token 64 chiều và 14 góc ngón tay, và trạng thái 46 chiều gồm chân, eo, tay, bàn tay, hướng trọng lực. Ảnh và câu lệnh không đổi. Có hai tầng dữ liệu:
 \begin{itemize}
-\item \textbf{Dữ liệu của SONIC:} 700 giờ bắt chuyển động của người, huấn luyện tốn 21 nghìn giờ GPU. Nhóm dùng checkpoint có sẵn, không huấn luyện lại. Dữ liệu và quy trình huấn luyện đi kèm repository được mô tả ở Mục~\ref{sec:sonic_data} và~\ref{sec:sonic_train}.
-\item \textbf{Dữ liệu fine-tune VLA:} NVIDIA thu bằng teleoperation VR: người điều khiển làm mẫu, SONIC bám theo trên robot, hệ thống ghi lại ảnh, trạng thái và motion token đang dùng theo định dạng LeRobot v2.1, nên nhãn token có sẵn. Tài liệu khuyến nghị tối thiểu 50 đến 100 demo cho một nhiệm vụ, mỗi demo làm đúng ngay lần đầu. Benchmark thật của NVIDIA với quy trình này đạt 73,6\% ở nhiệm vụ đi tới bàn và nhấc vật, huấn luyện trên khoảng 18 nghìn episode với khoảng 50 vật; và 66,7\% ở nhiệm vụ bỏ lon vào thùng rác, huấn luyện trên khoảng 150 episode.
+\item Dữ liệu của SONIC: 700 giờ bắt chuyển động của người, huấn luyện tốn 21 nghìn giờ GPU. Nhóm dùng checkpoint có sẵn, không huấn luyện lại. Dữ liệu và quy trình huấn luyện đi kèm repository được mô tả ở Mục~\ref{sec:sonic_data} và~\ref{sec:sonic_train}.
+\item Dữ liệu fine-tune VLA: NVIDIA thu bằng teleoperation VR: người điều khiển làm mẫu, SONIC bám theo trên robot, hệ thống ghi lại ảnh, trạng thái và motion token đang dùng theo định dạng LeRobot v2.1, nên nhãn token có sẵn. Tài liệu khuyến nghị tối thiểu 50 đến 100 demo cho một nhiệm vụ, mỗi demo làm đúng ngay lần đầu. Benchmark thật của NVIDIA với quy trình này đạt 73,6\% ở nhiệm vụ đi tới bàn và nhấc vật, huấn luyện trên khoảng 18 nghìn episode với khoảng 50 vật; và 66,7\% ở nhiệm vụ bỏ lon vào thùng rác, huấn luyện trên khoảng 150 episode.
 \end{itemize}
 Với nhóm, dữ liệu mô phỏng tự sinh không có token sẵn, phải chạy bộ mã hoá của SONIC trên quỹ đạo khớp để tính. Nhóm đã bọc bộ mã hoá này nhưng chưa kiểm chứng xong cách ghép vector đầu vào, nên dữ liệu hiện tại vẫn theo khai báo \code{REAL\_G1}.
 
@@ -581,9 +580,9 @@ Công cụ triển khai & Policy server, ONNX, TensorRT, tích hợp LeRobot & P
 \end{tabular}
 \end{table}
 
-\textbf{GR00T N1.7 tốt hơn ở đâu.} Nó là lựa chọn duy nhất trong hai mô hình có đường đi hoàn chỉnh cho robot hình người: dữ liệu, tag embodiment, bộ điều khiển toàn thân và benchmark thật trên Unitree G1. Việc đóng băng backbone và tách ngăn trọng số theo embodiment làm fine-tune rẻ và ổn định. Công cụ triển khai đầy đủ hơn.
+\emph{GR00T N1.7 tốt hơn ở đâu.} Nó là lựa chọn duy nhất trong hai mô hình có đường đi hoàn chỉnh cho robot hình người: dữ liệu, tag embodiment, bộ điều khiển toàn thân và benchmark thật trên Unitree G1. Việc đóng băng backbone và tách ngăn trọng số theo embodiment làm fine-tune rẻ và ổn định. Công cụ triển khai đầy đủ hơn.
 
-\textbf{GR00T N1.7 chưa bằng ở đâu.} Nó không có bước suy luận cấp cao: khi nhiệm vụ dài và cần chia thành nhiều bước, $\pi_{0.5}$ tự nói ra bước con rồi làm, còn GR00T phải dựa vào câu lệnh ngắn và dữ liệu demo. Kết quả khái quát sang môi trường lạ của GR00T được công bố ít hơn và chủ yếu trên benchmark mô phỏng. Backbone đóng băng cũng có nghĩa phần hiểu ảnh không học được gì mới từ dữ liệu của mình nếu không mở thêm cờ tốn tài nguyên.
+\emph{GR00T N1.7 chưa bằng ở đâu.} Nó không có bước suy luận cấp cao: khi nhiệm vụ dài và cần chia thành nhiều bước, $\pi_{0.5}$ tự nói ra bước con rồi làm, còn GR00T phải dựa vào câu lệnh ngắn và dữ liệu demo. Kết quả khái quát sang môi trường lạ của GR00T được công bố ít hơn và chủ yếu trên benchmark mô phỏng. Backbone đóng băng cũng có nghĩa phần hiểu ảnh không học được gì mới từ dữ liệu của mình nếu không mở thêm cờ tốn tài nguyên.
 
 \section{So với các mô hình khác}
 
@@ -596,12 +595,12 @@ Trong dự án của nhóm, quỹ đạo lập trình sẵn chỉ chịu đượ
 \section{Nhược điểm hiện tại của GR00T N1.7}
 
 \begin{itemize}
-\item \textbf{Chưa dùng ngay được cho robot mới.} Với robot ngoài danh sách tiền huấn luyện, phải có dữ liệu demo và fine-tune; zero-shot chỉ hoạt động trên các embodiment có sẵn.
-\item \textbf{Không có suy luận nhiều bước.} Mô hình chỉ nhìn hai khung ảnh và một câu lệnh, không nhớ dài, không tự chia nhiệm vụ.
-\item \textbf{Thiếu dữ liệu và checkpoint cho whole-body control.} Tag \code{UNITREE\_G1\_SONIC} tồn tại nhưng NVIDIA chưa công bố dataset hay checkpoint fine-tune; muốn dùng phải tự thu dữ liệu bằng teleoperation VR hoặc tự tính token.
-\item \textbf{Phụ thuộc thống kê chuẩn hoá.} Sai thứ tự khớp, sai hệ toạ độ hoặc sai thống kê là mô hình cho quỹ đạo vô nghĩa, và không có cảnh báo. Nhóm đã mất thời gian dò lại quy ước thứ tự ngón tay và hệ toạ độ cổ tay vì tài liệu không ghi.
-\item \textbf{Cần GPU.} Tối thiểu 16\,GB để chạy, 40\,GB để fine-tune; backbone Cosmos-Reason2 là mô hình gated trên Hugging Face, phải xin quyền.
-\item \textbf{Tỉ lệ thành công thật còn thấp.} Ngay trên benchmark của NVIDIA, GR00T N1.7 với SONIC đạt 73,6\% ở nhiệm vụ đi tới bàn và nhấc vật, dù dùng khoảng 18 nghìn episode và tay kẹp UMI tự thiết kế; nhiệm vụ bỏ lon vào thùng rác đạt 66,7\% trên 12 lần thử.
+\item Chưa dùng ngay được cho robot mới. Với robot ngoài danh sách tiền huấn luyện, phải có dữ liệu demo và fine-tune; zero-shot chỉ hoạt động trên các embodiment có sẵn.
+\item Không có suy luận nhiều bước. Mô hình chỉ nhìn hai khung ảnh và một câu lệnh, không nhớ dài, không tự chia nhiệm vụ.
+\item Thiếu dữ liệu và checkpoint cho whole-body control. Tag \code{UNITREE\_G1\_SONIC} tồn tại nhưng NVIDIA chưa công bố dataset hay checkpoint fine-tune; muốn dùng phải tự thu dữ liệu bằng teleoperation VR hoặc tự tính token.
+\item Phụ thuộc thống kê chuẩn hoá. Sai thứ tự khớp, sai hệ toạ độ hoặc sai thống kê là mô hình cho quỹ đạo vô nghĩa, và không có cảnh báo. Nhóm đã mất thời gian dò lại quy ước thứ tự ngón tay và hệ toạ độ cổ tay vì tài liệu không ghi.
+\item Cần GPU. Tối thiểu 16\,GB để chạy, 40\,GB để fine-tune; backbone Cosmos-Reason2 là mô hình gated trên Hugging Face, phải xin quyền.
+\item Tỉ lệ thành công thật còn thấp. Ngay trên benchmark của NVIDIA, GR00T N1.7 với SONIC đạt 73,6\% ở nhiệm vụ đi tới bàn và nhấc vật, dù dùng khoảng 18 nghìn episode và tay kẹp UMI tự thiết kế; nhiệm vụ bỏ lon vào thùng rác đạt 66,7\% trên 12 lần thử.
 \end{itemize}
 
 % ---------------------------------------------------------------------
@@ -625,31 +624,36 @@ Không có dataset công khai nào đúng bài toán, nên nhóm tự sinh dữ 
 
 \begin{itemize}
 \item Phiên bản đầu dùng quỹ đạo lập trình sẵn, lon lệch trong ô $4 \times 4$\,cm: 100 episode huấn luyện, 40 episode kiểm tra. Hạn chế: hành động gần như không phụ thuộc vị trí lon nên mô hình có thể học thuộc quỹ đạo thay vì học nhìn.
-\item Phiên bản hai dùng động học ngược giải theo từng episode: lon đặt ngẫu nhiên trong vùng $11 \times 16$\,cm, đứng hoặc nằm với hướng bất kỳ; có kiểm tra va chạm, tự chọn đường vòng khi bị chắn. Bộ lập kế hoạch thành công 36/36 với lon đứng, 78\% với lon nằm bên tay phải và 69\% bên tay trái. Chỉ giữ episode thành công và phát lại được.
+\item Phiên bản hai dùng động học ngược giải theo từng episode: lon đặt ngẫu nhiên trong vùng $11 \times 16$\,cm, đứng hoặc nằm với hướng bất kỳ; có kiểm tra va chạm, tự chọn đường vòng khi bị chắn. Bộ lập kế hoạch thành công 36/36 với lon đứng, 78\% với lon nằm bên tay phải và 69\% bên tay trái. Chỉ giữ episode thành công và phát lại được. Bộ dữ liệu gồm 400 episode huấn luyện và 40 episode kiểm tra, ghi ở 25 khung mỗi giây, mỗi episode 233 khung tương đương 9,3\,s; tập kiểm tra dùng seed khác hẳn tập huấn luyện. Bản mới nhất còn cho hai lon đổi phía trong khoảng một nửa số episode để mô hình buộc phải nhìn màu lon thay vì học lối tắt theo phía tay, và giữ tay đứng yên 2,5\,s sau khi đặt lon để mô hình không lặp lại động tác gắp.
 \item Có công cụ kiểm tra định dạng, phát lại hành động qua mô phỏng, và vẽ phân bố vị trí lon để bảo đảm tập kiểm tra không trùng tập huấn luyện.
 \end{itemize}
 
 \section{Fine-tune trên Google Colab}
 
-Nhóm fine-tune từ checkpoint gốc trên GPU L4, batch 32, 5000 bước, dữ liệu phiên bản đầu, khai báo dưới tag \code{NEW\_EMBODIMENT}. Kết quả open-loop ở Bảng~\ref{tab:openloop}.
+Nhóm fine-tune từ checkpoint gốc trên GPU L4, batch 32, khai báo dưới tag \code{NEW\_EMBODIMENT}, hai lần: lần đầu 5000 bước trên dữ liệu phiên bản đầu, lần hai 10\,000 bước trên 400 episode của dữ liệu phiên bản hai. Mỗi lần đánh giá open-loop trên 40 episode huấn luyện và 40 episode kiểm tra, kết quả ở Bảng~\ref{tab:openloop}.
 
 \begin{table}[htbp]
 \centering\small
-\caption{Sai số open-loop của checkpoint 5000 bước, đơn vị hành động chuẩn hoá. MAE 0,005 tương đương khoảng 0,3 độ.}
+\caption{Sai số open-loop của hai lần fine-tune, đơn vị hành động chuẩn hoá. MAE 0,005 tương đương khoảng 0,3 độ.}
 \label{tab:openloop}
-\begin{tabular}{llrr}
+\begin{tabular}{lllrr}
 \toprule
-\textbf{Tập} & \textbf{Lon} & \textbf{MSE trung bình} & \textbf{MAE trung bình}\\
+\textbf{Dữ liệu} & \textbf{Tập} & \textbf{Nhóm} & \textbf{MSE TB} & \textbf{MAE TB}\\
 \midrule
-Huấn luyện & Coca, 20 episode & 0,000303 & 0,00509\\
-Huấn luyện & Pepsi, 20 episode & 0,000264 & 0,00509\\
-Kiểm tra & Coca, 20 episode & 0,000320 & 0,00537\\
-Kiểm tra & Pepsi, 20 episode & 0,000267 & 0,00516\\
+Phiên bản đầu, 5000 bước & Huấn luyện & 40 episode & 0,000284 & 0,00509\\
+ & Kiểm tra & 40 episode & 0,000294 & 0,00526\\
+\midrule
+Phiên bản hai, 10\,000 bước & Huấn luyện & 40 episode & 0,00395 & 0,0149\\
+ & Kiểm tra & 40 episode & 0,00537 & 0,0189\\
+ & Kiểm tra & lon đứng, 18 episode & 0,00392 & 0,0152\\
+ & Kiểm tra & lon nằm, 22 episode & 0,00656 & 0,0219\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Nhận định: chênh lệch giữa tập huấn luyện và kiểm tra khoảng 3\%, sai số đều giữa các episode, nên mô hình không học thuộc trong vùng đã thử. Nhưng vì dữ liệu phiên bản đầu ít phụ thuộc vị trí lon, kết quả này chưa chứng minh mô hình biết nhìn lon. Việc đang làm: sinh khoảng 400 episode từ dữ liệu phiên bản hai, fine-tune lại, và chạy closed-loop bằng công cụ đánh giá đã viết, đo tỉ lệ gắp thành công theo vị trí lon.
+Nhận định về lần đầu: chênh lệch giữa tập huấn luyện và kiểm tra khoảng 3\% và sai số đều giữa các episode, nhưng khi chạy closed-loop chỉ đạt 3/10 lần gắp thành công: tay khép đúng lúc nhưng cách lon hơn 5\,cm vì mô hình lệch có hệ thống khoảng 1\,cm so với demo, trong khi quỹ đạo lập trình sẵn chỉ cho biên dư 0,7\,cm. Sai số open-loop rất thấp vì mô hình học thuộc quỹ đạo, không phải vì biết nhìn lon.
+
+Nhận định về lần hai: MAE cao gấp khoảng 3 đến 4 lần lần đầu là điều dự kiến, vì hành động giải bằng động học ngược phụ thuộc thật vào vị trí và hướng lon, hai con số không so sánh trực tiếp được. Checkpoint 10\,000 bước tốt hơn checkpoint 5000 bước rõ rệt, MAE giảm 30 đến 39\% trên cả hai tập. Chênh lệch giữa tập huấn luyện và kiểm tra khoảng 27\%, tập kiểm tra vẫn đang cải thiện nên chưa phải overfit có hại. Lon nằm vẫn là điểm yếu, sai số cao hơn lon đứng khoảng 1,4 lần. Việc đang làm: chạy closed-loop với checkpoint này trên tập kiểm tra bằng công cụ đánh giá đã viết để đo tỉ lệ gắp thành công theo vị trí lon, và fine-tune trên bản dữ liệu có lon đổi phía.
 
 \section{Bài học rút ra}
 
