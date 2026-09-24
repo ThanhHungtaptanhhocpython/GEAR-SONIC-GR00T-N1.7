@@ -93,7 +93,8 @@ def run_episode(job) -> dict:
 
     can, can_adr = ctx["can"], ctx["can_adr"][ctx["can"]]
     grasp = sim.grasps[can]
-    lying = cd.sample_randomization(task, seed, cfg)["cans"][can]["lying"]
+    rand = cd.sample_randomization(task, seed, cfg)
+    lying, swapped = rand["cans"][can]["lying"], rand["swapped"]
     can_start = sim.data.qpos[can_adr:can_adr + 3].copy()
     d_close = t_grasp = t_success = None
     can_max_z, max_pitch = -np.inf, 0.0
@@ -125,7 +126,7 @@ def run_episode(job) -> dict:
     d = sim.data
     other_adr = ctx["can_adr"][ctx["other"]]
     r = {
-        "task": task, "seed": seed, "lying": bool(lying),
+        "task": task, "seed": seed, "lying": bool(lying), "swapped": bool(swapped),
         "ok": cd.is_success(pipe, ctx), "ok_any": t_success is not None, "t_success": t_success,
         "grasped": t_grasp is not None, "t_grasp": t_grasp,
         "dist_at_close_cm": None if d_close is None else round(d_close * 100, 2),
@@ -153,7 +154,8 @@ def load_jobs(args) -> list:
             eps = eps[: args.max_episodes]
         return [(e["task"], e["seed"], e["cfg"]) for e in eps]
     cfg = {"can_x": args.can_x, "can_y": args.can_y, "lying_prob": args.lying_prob, "can_gap": args.can_gap,
-           "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise}
+           "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise, "swap_prob": args.swap_prob,
+           "cross_can_y": args.cross_can_y}
     return [(t, args.seed + i, cfg) for i in range(args.episodes_per_task) for t in args.tasks]
 
 
@@ -161,7 +163,10 @@ def summarize(results: list) -> str:
     lines = ["", f"{'nhóm':22s} {'thành công':>12s} {'kẹp được':>10s} {'k/c lúc khép (cm)':>18s}"]
     groups = collections.OrderedDict()
     for r in results:
-        for key in ("tất cả", r["task"], f"{r['task']} {'nằm' if r['lying'] else 'đứng'}"):
+        keys = ["tất cả", r["task"], f"{r['task']} {'nằm' if r['lying'] else 'đứng'}"]
+        if any(x.get("swapped") for x in results):
+            keys.append(f"{r['task']} {'đổi phía' if r.get('swapped') else 'cùng phía'}")
+        for key in keys:
             groups.setdefault(key, []).append(r)
     for key in ["tất cả"] + sorted(k for k in groups if k != "tất cả"):
         g = groups[key]
@@ -193,6 +198,8 @@ def main():
     p.add_argument("--can-y", type=float, nargs=2, default=[0.03, 0.19])
     p.add_argument("--lying-prob", type=float, default=0.5)
     p.add_argument("--can-gap", type=float, default=0.03)
+    p.add_argument("--swap-prob", type=float, default=0.0, help="Xác suất hai lon đổi phía (như collect_demos)")
+    p.add_argument("--cross-can-y", type=float, nargs=2, default=[0.03, 0.15])
     p.add_argument("--tray-jitter", type=float, default=0.02)
     p.add_argument("--joint-noise", type=float, default=0.05)
     p.add_argument("--seconds", type=float, default=10.0, help="Thời gian chạy mỗi episode (demo dài 7.5 s)")
@@ -219,7 +226,8 @@ def main():
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
             f.flush()
             print(f"[{time.time() - t0:5.0f}s] {len(results):3d}/{len(jobs)} {r['task']:5s} seed {r['seed']:6d} "
-                  f"{'nằm ' if r['lying'] else 'đứng'} {'OK  ' if r['ok'] else 'FAIL'} | {r['reason']} | "
+                  f"{'nằm ' if r['lying'] else 'đứng'}{' đổi phía' if r['swapped'] else ''} "
+                  f"{'OK  ' if r['ok'] else 'FAIL'} | {r['reason']} | "
                   f"k/c khép {r['dist_at_close_cm']} cm | lỗi server {r['server_errors']}", flush=True)
 
     summary = summarize(results)

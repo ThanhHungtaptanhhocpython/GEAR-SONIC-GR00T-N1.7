@@ -111,14 +111,19 @@ def _clear_of_tray(points: np.ndarray, tray_xy: np.ndarray, tray_half: float) ->
 def sample_randomization(task: str, seed: int, cfg: dict) -> dict:
     """Trạng thái đầu ngẫu nhiên của episode (tái tạo được từ task + seed + cfg).
 
+    Mặc định lon Coca ở nửa bàn bên phải (phía khay Coca), Pepsi bên trái. Với xác suất cfg["swap_prob"] hai lon đổi
+    phía cho nhau; lon cần gắp khi đó nằm ở nửa bên kia, |y| trong cfg["cross_can_y"] (tầm với chéo người).
+
     Returns:
         tray: độ lệch x/y của khay đích (m); cans: {lon: {pos, quat, lying, yaw}} tuyệt đối trong khung world;
-        joints: nhiễu khớp hai tay ban đầu (rad).
+        joints: nhiễu khớp hai tay ban đầu (rad); swapped: hai lon có đổi phía không.
     """
     rng = np.random.default_rng(seed)
     layout = scene_layout()
     can, other = _task_can(task)
     tray = rng.uniform(-cfg["tray_jitter"], cfg["tray_jitter"], 2)
+    # cfg cũ không có swap_prob: không rút thêm số ngẫu nhiên, để dataset cũ tái tạo đúng từng số
+    swapped = "swap_prob" in cfg and bool(rng.random() < cfg["swap_prob"])
 
     cans = {}
     if "can_jitter" in cfg:
@@ -131,10 +136,11 @@ def sample_randomization(task: str, seed: int, cfg: dict) -> dict:
         trays = [layout["tray"][c][:2] + (tray if c == can else 0.0) for c in TASKS]
         placed = []
         for c in (can, other):
-            side = -1.0 if c == "coke" else 1.0
+            side = (-1.0 if c == "coke" else 1.0) * (-1.0 if swapped else 1.0)
+            can_y = cfg["cross_can_y"] if swapped and c == can else cfg["can_y"]
             for _ in range(1000):
                 x = rng.uniform(*cfg["can_x"])
-                y = side * rng.uniform(*cfg["can_y"])
+                y = side * rng.uniform(*can_y)
                 lying = bool(rng.random() < cfg["lying_prob"])
                 yaw = float(rng.uniform(-np.pi, np.pi))
                 pts = _footprint(x, y, lying, yaw)
@@ -151,7 +157,7 @@ def sample_randomization(task: str, seed: int, cfg: dict) -> dict:
             cans[c] = {"pos": np.array([x, y, z]), "quat": can_quat(lying, yaw), "lying": lying, "yaw": yaw}
 
     joints = {side: rng.normal(0.0, cfg["joint_noise"], 7) for side in ("left", "right")}
-    return {"tray": tray, "cans": cans, "joints": joints}
+    return {"tray": tray, "cans": cans, "joints": joints, "swapped": swapped}
 
 
 def setup_episode(task: str, seed: int, cfg: dict, pipeline_kwargs: Optional[dict] = None):
@@ -159,31 +165,42 @@ def setup_episode(task: str, seed: int, cfg: dict, pipeline_kwargs: Optional[dic
 
     pipeline_kwargs: tham số thêm cho ClosedLoopVLAPipeline (ví dụ policy_mode="remote" khi đánh giá model).
     """
-    import mujoco
 
     from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
 
-    rand = sample_randomization(task, seed, cfg)
     kwargs = {"policy_mode": "standalone", **(pipeline_kwargs or {})}
     with contextlib.redirect_stdout(io.StringIO()):
         pipe = ClosedLoopVLAPipeline(task_prompt=TASKS[task], **kwargs)
+    return pipe, apply_randomization(pipe, task, sample_randomization(task, seed, cfg))
+
+
+def apply_randomization(pipe, task: str, rand: dict) -> dict:
+    """Đặt trạng thái đầu `rand` (sample_randomization) lên sim vừa tạo hoặc vừa reset: vị trí/hướng hai lon, khay
+    đích (khay kia về vị trí mặc định), tư thế hai tay ban đầu. Gọi lại nhiều lần không cộng dồn độ lệch khay.
+
+    Returns:
+        ctx dùng cho is_success.
+    """
+    import mujoco
+
     sim, adapter = pipe.sim, pipe.g1_adapter
     m, d = sim.model, sim.data
+    layout = scene_layout()
     can, other = _task_can(task)
     can_adr = {"coke": sim.coke_adr, "pepsi": sim.pepsi_adr}
     tray_bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, f"{can}_tray")
 
-    # Ngẫu nhiên hoá: vị trí/hướng hai lon, khay đích, tư thế hai tay ban đầu
-    m.body_pos[tray_bid][:2] += rand["tray"]
+    for c in TASKS:
+        bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, f"{c}_tray")
+        m.body_pos[bid][:2] = layout["tray"][c][:2] + (rand["tray"] if c == can else 0.0)
     for c in (can, other):
         d.qpos[can_adr[c]:can_adr[c] + 3] = rand["cans"][c]["pos"]
         d.qpos[can_adr[c] + 3:can_adr[c] + 7] = rand["cans"][c]["quat"]
     for side in ("left", "right"):
         d.qpos[sim.act_qposadr[adapter.arm_idx[side]]] += rand["joints"][side]
     mujoco.mj_forward(m, d)
-    ctx = {"can": can, "other": other, "can_adr": can_adr, "tray_bid": tray_bid,
-           "other_start": d.qpos[can_adr[other]:can_adr[other] + 3].copy()}
-    return pipe, ctx
+    return {"can": can, "other": other, "can_adr": can_adr, "tray_bid": tray_bid,
+            "other_start": d.qpos[can_adr[other]:can_adr[other] + 3].copy()}
 
 
 def is_success(pipe, ctx) -> bool:
@@ -242,7 +259,8 @@ def run_episode(job):
     scratch = mujoco.MjData(sim.model)
     planner = PickPlacePlanner(sim, ctx["can"])
     frames, states, actions = [], [], []
-    base = {"task": task, "seed": seed, "lying": sample_randomization(task, seed, cfg)["cans"][ctx["can"]]["lying"]}
+    rand = sample_randomization(task, seed, cfg)
+    base = {"task": task, "seed": seed, "lying": rand["cans"][ctx["can"]]["lying"], "swapped": rand["swapped"]}
     try:
         # Generator lập kế hoạch từng đoạn từ trạng thái hiện tại: mục tiêu của bước k tính từ trạng thái trước bước k
         for step, target in enumerate(planner.targets()):
@@ -332,12 +350,12 @@ def write_meta(out: Path, episodes, cfg: dict):
             f.write(json.dumps({"episode_index": i, "tasks": [TASKS[ep["task"]]], "length": ep["length"]}) + "\n")
 
     # Seed và cấu hình ngẫu nhiên hoá của từng episode, để tái tạo trạng thái đầu khi phát lại (verify_demos.py);
-    # kèm tư thế lon cần gắp và độ nghiêng lòng bàn tay lúc gắp để tiện phân tích
+    # kèm tư thế lon cần gắp, lon có đổi phía không và độ nghiêng lòng bàn tay lúc gắp để tiện phân tích
     with open(meta / "collection.jsonl", "w") as f:
         for i, ep in enumerate(episodes):
             f.write(json.dumps({
                 "episode_index": i, "task": ep["task"], "seed": ep["seed"], "cfg": cfg,
-                "lying": ep["lying"], "palm_tilt_deg": ep["palm_tilt_deg"],
+                "lying": ep["lying"], "swapped": ep["swapped"], "palm_tilt_deg": ep["palm_tilt_deg"],
             }) + "\n")
 
     modality = {
@@ -401,7 +419,11 @@ def main():
     parser.add_argument("--can-x", type=float, nargs=2, default=[0.26, 0.37], metavar=("MIN", "MAX"),
                         help="Khoảng x (về phía trước) của tâm lon (m)")
     parser.add_argument("--can-y", type=float, nargs=2, default=[0.03, 0.19], metavar=("MIN", "MAX"),
-                        help="Khoảng |y| của tâm lon, mỗi lon ở phía tay gắp nó (m)")
+                        help="Khoảng |y| của tâm lon, lon ở phía khay của nó (m)")
+    parser.add_argument("--swap-prob", type=float, default=0.0,
+                        help="Xác suất hai lon đổi phía cho nhau (lon cần gắp nằm ở nửa bàn bên kia, gắp chéo người)")
+    parser.add_argument("--cross-can-y", type=float, nargs=2, default=[0.03, 0.15], metavar=("MIN", "MAX"),
+                        help="Khoảng |y| của tâm lon cần gắp khi đổi phía (m)")
     parser.add_argument("--lying-prob", type=float, default=0.5, help="Xác suất mỗi lon nằm (hướng ngẫu nhiên)")
     parser.add_argument("--can-gap", type=float, default=0.03, help="Khoảng hở tối thiểu giữa hai lon (m)")
     parser.add_argument("--tray-jitter", type=float, default=0.02, help="Lệch tối đa vị trí khay đích (m)")
@@ -414,7 +436,8 @@ def main():
     tmp_dir = out / "_tmp"
     tmp_dir.mkdir(parents=True)
     cfg = {"can_x": args.can_x, "can_y": args.can_y, "lying_prob": args.lying_prob, "can_gap": args.can_gap,
-           "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise}
+           "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise, "swap_prob": args.swap_prob,
+           "cross_can_y": args.cross_can_y}
 
     # Chạy xen kẽ hai nhiệm vụ; số lần thử mỗi đợt ước theo tỉ lệ thành công đã đo để bù episode thất bại
     kept = {t: [] for t in TASKS}
@@ -436,7 +459,7 @@ def main():
                     seed += 1
             for res in pool.imap(run_episode, jobs):
                 attempts[res["task"]] += 1
-                st = stats[(res["task"], "nằm" if res["lying"] else "đứng")]
+                st = stats[(res["task"], ("nằm" if res["lying"] else "đứng") + (", đổi phía" if res["swapped"] else ""))]
                 st["tries"] += 1
                 if not res["ok"]:
                     st["fail"][res["reason"].split(" (")[0]] += 1
@@ -474,7 +497,7 @@ def main():
 
     print(f"\nĐã ghi {len(episodes)} episode ({global_start} khung hình) vào {out}")
     lying = sum(ep["lying"] for ep in episodes)
-    print(f"Lon cần gắp: {len(episodes) - lying} đứng, {lying} nằm")
+    print(f"Lon cần gắp: {len(episodes) - lying} đứng, {lying} nằm; {sum(ep['swapped'] for ep in episodes)} đổi phía")
     print("Tỉ lệ thành công khi thu:")
     for (t, pose), st in sorted(stats.items()):
         print(f"  {t:5s} {pose}: {st['ok']}/{st['tries']}")
