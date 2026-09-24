@@ -354,6 +354,13 @@ lon nằm đã tự chiếm đa số.
   - A100 80 GB: batch 64 và giữ 5000 bước.
   - Hai phương án cho tổng số mẫu như nhau. Xem VRAM ở Bước 8b để quyết định. Learning rate giữ mặc định.
 
+- **Bước 7 tính thống kê song song (24/09):** `stats.py` gốc tính thống kê action relative tuần tự bằng Python. Riêng 2 khoá EEF
+  mất khoảng 0.9 s/episode: 400 episode tốn khoảng 7 phút trên Colab, 12.7 phút trên máy local.
+  - Bước 7 giờ thay `calculate_stats_for_key` bằng bản chạy `Pool(os.cpu_count())` theo episode, vẫn gọi đúng
+    `load_relative_actions` và giữ thứ tự.
+  - Trên máy local mất 127 s. So với bản gốc trên `g1_can_sort_swap_hold`, `stats.json` và `relative_stats.json` **giống hệt**.
+  - Chưa đo trên Colab.
+
 ### Quyết định
 - **Tag `NEW_EMBODIMENT`**, không dùng `REAL_G1`: checkpoint base đã có thống kê REAL_G1 nên `set_statistics(override=False)` bỏ qua
   thống kê của dữ liệu sim mà chỉ in cảnh báo. Cái giá: projector riêng cho robot (ngăn số 10) học lại từ đầu.
@@ -416,7 +423,8 @@ Episode test sai nhiều nhất: 27 (Pepsi, nằm, 0.0507), 37 (Pepsi, nằm, 0.
 - Open-loop không nói được tỉ lệ gắp thành công (mục 5.1: MAE pilot 0.005 vẫn chỉ đạt 3/10). Bước tiếp theo là chạy
   closed-loop `eval_closed_loop.py`.
 
-### 5.0c. Checkpoint IK `g1_can_sort_ik/checkpoint-10000` (`MAX_STEPS=10000`, batch 32, 24/09)
+### 5.0c. Checkpoint IK `g1_can_sort_ik/checkpoint-10000` (`MAX_STEPS=10000`, batch **64** trên A100 80 GB, 24/09)
+- 10000 × 64 = 640k mẫu, khoảng 8.5 lần đi qua 75 200 khung. (Bản ghi đầu tiên của mục này ghi nhầm batch 32.)
 - Loss 1.33 → 0.0041 ở bước 10000 (trung bình trượt; 0.0046 ở bước 9100, khoảng 0.011 ở bước 5000). Grad norm đạt đỉnh khoảng 1.6 lúc warmup (bước ~400) rồi giảm đều
   về khoảng 0.2, không có spike. LR warmup 500 bước lên 1e-4, cosine còn khoảng 2e-6 ở bước 9100.
 - Train ổn định. Loss vẫn giảm ở cuối, nhưng một phần là do LR giảm về 0, nên 900 bước còn lại chỉ giảm thêm rất ít.
@@ -474,6 +482,128 @@ Lon ở vị trí mặc định, tức giữa vùng train của pilot.
 - Tunnel **Pinggy miễn phí hết hạn sau khoảng 60 phút**. Khi server không phản hồi thì chạy lại Bước 6 của notebook server để lấy
   host/port mới; server chạy nền nên không phải nạp lại model (từ 24/09, mục 5.3).
 
+### 5.2b. Closed-loop checkpoint IK-10000, bản thử 4 episode test (24/09, `eval/ik10k_smoke`)
+Server chạy bản cũ nên `server_model` = null; dựa vào hành vi thì đây đúng là checkpoint-10000. Video của lần chạy model base
+(xem 5.3) đã chuyển sang `eval/base_smoke/videos/`.
+
+| Seed | Lon | Kết quả | K/c lúc khép | Kẹp lúc | Ngả tối đa |
+|---|---|---|---|---|---|
+| 100044 | Pepsi đứng | **OK** (đặt xong lúc 5.5 s) | 3.4 cm | 2.32 s | 11.2° |
+| 100001 | Coca nằm | **OK** (5.5 s) | 3.4 cm | 2.14 s | 4.9° |
+| 100002 | Coca nằm | FAIL: khép tay nhưng không kẹp được | **8.1 cm** | – | 11.3° |
+| 100046 | Pepsi đứng | **OK** | 2.0 cm | – | 6.3° |
+
+- **3/4**, trong khi pilot chỉ được 3/10 và chỉ ở vị trí mặc định. Model IK gắp được cả lon nằm và tay đi đúng tới lon.
+- Ca hỏng 100002 (lon nằm ở x = 0.329, y = −0.095): tay khép khi còn cách lon 8 cm. Sau đó tay kéo lê lon (không nhấc lên,
+  độ nhấc −0.1 cm) sang phía khay, rồi lon rơi khỏi bàn (z cuối 0.032). `ok_any` = true lúc 5.5 s chỉ là lúc lon trượt qua khay.
+- 4 episode là quá ít để kết luận; bước tiếp theo là chạy đủ 40 episode test.
+
+### 5.2c. Eval cho phép thử lại (24/09)
+- Ý tưởng: không cắt ở 10 s rồi kết luận thất bại mà chạy dài hơn (`--seconds 30`) để model tự thử lại. Model chưa từng thấy
+  thử lại trong demo (episode lỗi đã bị loại), nhưng ca 100051 cho thấy model tự bắt đầu lại task khi tay đã về ready và lon
+  không nằm trong khay; thử lại có thể đến từ chính hành vi này.
+- Giới hạn: trong các ca hụt lon nằm, lon thường bị kéo lê rồi rơi khỏi bàn (100002, 100049, 100008), nên không thể thử lại.
+  Chạy dài hơn cũng làm tăng lỗi "đặt xong rồi gắp lại".
+- Vì vậy báo cả ba số: thành công ngay lần đầu (`t_success` ≤ ~7.5 s), từng đặt xong trong T giây (`ok_any`), và trạng thái
+  cuối (`ok`).
+- `eval_closed_loop.py` thêm các trường:
+  - `attempts`: số lần khép tay, tính theo cạnh lên.
+  - `can_fell`: z cuối thấp hơn lúc đầu 0.2 m; lý do thất bại mới là "lon rơi khỏi bàn", được xét trước các lý do khác.
+  - Summary in số lần khép TB/tối đa, số lon rơi, và thời điểm đặt xong lần đầu (trung vị, muộn nhất).
+
+### 5.2d. Closed-loop 27/40 episode test và quyết định dataset tiếp theo (24/09)
+Bộ chạy đủ 40 episode dừng ở 27/40 (`eval/ik10k_smoke/results.jsonl`; `summary.txt` trong thư mục đó vẫn là của bản thử 4 episode).
+- **Thành công 19/27 (70%)**, từng đặt xong 21/27 (78%), server không lỗi lần nào.
+- Theo nhóm: Coca nằm 6/10, Coca đứng 3/4, Pepsi nằm 5/6, Pepsi đứng 5/7 (Pepsi đứng từng đặt xong 7/7).
+- Lỗi:
+  - Khép tay nhưng không kẹp được: 5 ca, 4 ca lon nằm; k/c lúc khép 5.8–7.1 cm, trong khi ca thành công là 1.0–4.8 cm.
+  - Đặt xong rồi gắp lại: 2 ca (100051, 100053), đều bắt đầu ở mốc khoảng 7.5 s, tức lúc hết dữ liệu demo.
+  - Xô lon còn lại: 1 ca.
+- Lỗi hụt lon nằm **không tụ theo hướng lon** (yaw 27–168°; với cùng yaw 98–108° có ca OK, có ca hỏng). Đây là lỗi độ chính
+  xác, không phải thiếu vùng dữ liệu, nên không đổi phân bố dữ liệu để sửa.
+- **Quyết định:** sinh lại **`g1_can_sort_swap`** (dataset train tiếp theo, chưa train lần nào) với `hold` dài hơn. **Giữ
+  nguyên** `g1_can_sort_ik` để mốc A (checkpoint-10000) còn tái lập được. Chưa làm episode "việc đã xong" (lon nằm sẵn trong khay,
+  robot chỉ đứng yên); làm sau nếu eval 30 s vẫn thấy gắp lại.
+- Code:
+  - `collect_demos.py --hold-seconds` (mặc định **2.5 s**, ghi vào `cfg.hold_seconds`; cfg không có khoá này thì 0.7 s như cũ).
+  - `PickPlacePlanner(hold_steps=...)`.
+  - Episode dài 7.5 → **9.3 s (233 khung)**.
+  - Notebook fine-tune Bước 9/11 đổi `--steps 200` → 400.
+  - Thử 4 episode (swap 0.7): verify OK, phát lại 4/4; action trong 2.5 s cuối không đổi, state dao động ≤ 0.03 rad.
+  - Open-loop MAE của dataset mới sẽ thấp hơn một chút do có thêm khung đứng yên, nên không so trực tiếp với A.
+
+### 5.2c. Closed-loop checkpoint IK-10000 trên tập test, 27/40 episode (24/09, `eval/ik10k_smoke`)
+Lần chạy 40 episode ghi đè lên `eval/ik10k_smoke` và dừng ở 27/40 lúc 15:54, không ghi summary, không rõ lý do (Ctrl+C
+hoặc server mất phản hồi làm cả script dừng). `summary.txt` được viết lại từ 27 kết quả.
+
+| Nhóm | Thành công | Từng đặt xong (`ok_any`) | K/c lúc khép TB |
+|---|---|---|---|
+| tất cả (27) | **19 (70%)** | 21 (78%) | 4.4 cm |
+| lon đứng (11) | 8 | **10 (91%)** | ~3.6 cm |
+| lon nằm (16) | 11 (69%) | 11 (69%) | ~5 cm |
+
+Lý do hỏng:
+- 5 lần khép tay nhưng không kẹp được, **khoảng cách lúc khép 5.8–7.1 cm**, trong khi ca thành công là 2–4.8 cm.
+  4/5 ca là lon nằm, 1 ca là lon đứng ở y = −0.153 (sát rìa vùng).
+- 2 lần **đặt xong rồi gắp lại**, đều là lon đứng (100051, 100053). Video 100051: đặt xong lúc 5.0 s, về ready lúc 6.2 s,
+  vươn tay lại lúc 6.8 s, gắp lon ra khỏi khay rồi đặt về bàn.
+  - Nguyên nhân: `hold` chỉ 35 bước 50 Hz = **0.7 s** (khoảng 17/188 khung mỗi demo), còn eval chạy 10 s, dài hơn demo 7.5 s.
+  - Ở tư thế ready, state gần như giống lúc bắt đầu episode; chỉ ảnh (lon đã nằm trong khay) cho biết việc đã xong.
+- 1 lần xô lon còn lại (lon nằm, tay khép cách lon 15 cm).
+
+Đề xuất (chờ người dùng duyệt):
+- Kéo dài `hold` lên 2.5–3 s, và thêm 10–15% episode "đã xong": lon nằm sẵn trong khay, action là đứng yên.
+- Gộp vào lần sinh dataset đổi phía để khỏi phải train hai lần.
+
+Công cụ (24/09): `summary.txt` có thêm cột "từng đặt xong". `eval_closed_loop.py --resume` giữ kết quả cũ và chỉ chạy episode còn
+thiếu. Script luôn ghi summary khi bị dừng giữa chừng, kèm dòng "CHƯA ĐỦ" (đã thử với server không phản hồi).
+Lưu ý: kiểm tra xem eval còn chạy không bằng `pgrep -f` với một pattern có chứa lệnh eval sẽ khớp luôn chính lệnh kiểm tra,
+nên nhìn thời điểm sửa của `results.jsonl` thì đáng tin hơn.
+
+### 5.2d-bis. Dataset `g1_can_sort_swap_hold` (sinh 24/09, 16:24–17:04)
+Lệnh như `g1_can_sort_swap` (`--episodes-per-task 200 --swap-prob 0.7`, cùng seed bắt đầu), thêm `--hold-seconds 2.5` (mặc
+định mới). Tập test: `--episodes-per-task 20 --seed 100000`.
+
+| Dataset | Episode | Khung | Đứng / nằm | Đổi phía | Verify | Zip |
+|---|---|---|---|---|---|---|
+| `g1_can_sort_swap_hold` (378 MB) | 400 (200 + 200) | 93 200 (233/ep) | 175 / 225 | 200 | định dạng OK, phát lại **400/400**, lệch khớp TB 0.046 rad, max 0.407 | 389 MB |
+| `g1_can_sort_swap_hold_test` (39 MB) | 40 | 9 320 | 12 / 28 | 26 | định dạng OK, phát lại **40/40**, lệch khớp TB 0.057 rad | 39 MB |
+
+- Phân bố gần như trùng bộ `swap` cũ (174 / 226, 202 đổi phía). Khác vài episode, có thể do `is_success` được xét sau khi
+  robot đứng yên thêm 1.8 s.
+- Số khung tăng 24% nhưng đều là khung đứng yên. Muốn phần gắp-đặt được học đủ như mốc A (10000 bước × batch 64 trên
+  75 200 khung) thì cần khoảng **12 500 bước với batch 64**, hoặc khoảng 6 200 bước với batch 128 (cùng số mẫu, ít lần cập nhật
+  hơn). Giữ batch 64 để so A/B chỉ khác dữ liệu.
+  Một phương án gọn khác là batch 80 × 10 000 bước = 800k mẫu (khoảng 8.6 lần đi qua dữ liệu, gần bằng A); giữ LR 1e-4.
+- Biểu đồ vị trí lon: `datasets/g1_can_sort_swap_hold_can_positions.png`.
+
+### 5.2e. GUI: `--stop-on-success`, phím 2 làm mất robot (24/09)
+- **Phím 2 làm robot biến mất:** phím 0–5 của viewer MuJoCo bật/tắt hiển thị geom group, mà mesh robot G1 (`class="visual"`)
+  nằm ở group 2. Mô phỏng không lỗi gì. Sửa: launcher tự bật lại group 1 và 2 mỗi vòng lặp.
+- **Đổi phím sang F8–F12 (24/09):** viewer MuJoCo dùng hết 26 chữ cái (phím tắt vis/render), 0–5 (geom group) và F1–F7.
+  Phím mới: F8 Coca, F9 Pepsi, F10 reset (thay R), F11 cảnh tiếp (thay N), F12 snapshot (thay S); SPACE vẫn là tạm dừng.
+  Đã bỏ phần tự đặt lại geom group/island vì không còn trùng phím. Thử bằng viewer giả: 1/2/N/R không còn tác dụng, F8–F12
+  chạy đúng. Chưa thử trong viewer thật.
+- **Phím N làm robot và lon thành màu vàng:** N là phím tắt `mjVIS_ISLAND` của viewer, tô màu theo constraint island. Sửa: đặt
+  lại cờ này về giá trị ban đầu mỗi vòng lặp, như cách làm với geom group. Phím R (phản chiếu) và S (bóng) vẫn bị viewer bật/tắt,
+  vì Python binding không cho truy cập `mjvScene.flags`; hai phím này chỉ ảnh hưởng hình ảnh.
+- **R / N:** đã thử vòng lặp chính với viewer giả; sau R, qpos trùng tuyệt đối với lúc bắt đầu, `reset()` đưa mọi trạng thái
+  về như pipeline mới.
+- **`--stop-on-success`** (mặc định bật; tắt bằng `--no-stop-on-success`): khi lon của nhiệm vụ hiện tại nằm trong khay và tay
+  đã nhả, chờ cổ tay rút xa lon thêm 6 cm so với lúc nhả (tối đa 2 s), rồi ngừng gọi model.
+  - Robot đi theo `PickPlacePlanner.return_to_ready` (nhấc tay 12 cm, về điểm cao trên ready, hạ xuống) rồi giữ tư thế ready,
+    tới khi bấm F10 / F11 / F8 / F9.
+  - Pipeline có thêm `hold_ready(path)`; `reset()` và đổi nhiệm vụ đều huỷ chế độ giữ.
+  - Hai phương án đã thử và bỏ:
+    - Chờ tay về trong 0.2 rad quanh ready: không bao giờ tới, vì "ready" của model lệch khoảng 0.4 rad, và sau khoảng 2 s
+      model đã vươn tay gắp lại.
+    - Nội suy khớp thẳng về ready: tay quét lon Pepsi đặt sát mép khay ra ngoài 3–4 cm.
+- Đoạn "về ready" của planner được tách thành `_return_path` (dùng chung). Đã kiểm tra: action sinh ra giống hệt
+  `g1_can_sort_swap_hold` (Δ = 0).
+- Thử với server thật (checkpoint-10000, viewer giả):
+  - Episode 1 (Pepsi): dừng lúc 6.1 s, không gọi model thêm, tay về ready, lon vẫn trong khay.
+  - Episode 0: đặt Coca, bấm 2 lúc 10 s, gắp Pepsi, giữ; cả hai lon ở trong khay tới 19 s.
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel
@@ -485,7 +615,20 @@ Lon ở vị trí mặc định, tức giữa vùng train của pilot.
     Cell chờ tới dòng "ĐANG LẮNG NGHE", nếu server thoát thì in cuối log.
   - Bước 6 mở tunnel **sau** khi server sẵn sàng. Chạy lại được bất cứ lúc nào: đóng tunnel cũ, in giờ hết hạn, in sẵn lệnh
     `eval_closed_loop.py` và lệnh GUI.
-  - Bước 7 in trạng thái (port, số request, suy luận TB, số Traceback, cuối log). Bước 8 dừng server (`pkill -f`).
+  - Bước 7 in trạng thái (port, số request, suy luận TB, số Traceback, cuối log). Bước 8 dừng server (`pkill -f`),
+    chỉ khi đặt `STOP_SERVER = True`: bản đầu dừng vô điều kiện nên "Chạy tất cả" tắt luôn server vừa khởi động.
+- Lần chạy đầu trên Colab: server nạp xong và lắng nghe (warm-up 3.2 s); tổng thời gian chép + nạp chưa ghi lại.
+- **Sự cố 24/09:** notebook sinh lại đưa `MODEL_PATH` về mặc định `nvidia/GR00T-N1.7-3B` (REAL_G1), nên server chạy **model base**.
+  Bản thử 4 episode `eval/ik10k_smoke` (seed 100044/100001/100002/100046) cả 4 đều "không khép tay": hai tay giơ lên vẫy,
+  một lần robot ngã (ngả 87.4°). Kết quả này **không phải** của checkpoint-10000. `eval_closed_loop` không bắt được lỗi này,
+  vì model base cũng trả `action_space = real_g1`.
+- Chống lặp lại:
+  - Bước 5 giờ mặc định là `g1_can_sort_ik/checkpoint-10000` + `new_embodiment`, và in model đang nạp; Bước 7 cũng in model.
+  - Server gửi `model` = {`model_path`, `embodiment_tag`} trong mỗi phản hồi; client lưu vào `server_model`.
+  - `eval_closed_loop.py --expect-embodiment` (mặc định `new_embodiment`, `''` để tắt): dừng nếu server báo embodiment khác.
+    Script ghi `server_model` vào `results.jsonl`, in ra sau episode đầu và ghi vào `summary.txt`.
+  - Đã thử với server giả: embodiment REAL_G1 thì script dừng kèm thông báo, `new_embodiment` thì chạy bình thường;
+    `verify_pipeline.py` qua cả 5 test. Server bản cũ không gửi `model` thì script chỉ cảnh báo.
 - Tốc độ chép Drive → local trên Colab chưa đo; xem số MB/s in ra ở Bước 5 lần tới.
 
 ---
@@ -566,8 +709,8 @@ Mục tiêu: gắp được lon **sâu hơn** trên bàn và **rộng hơn** d�
      tiếp được. Checkpoint pilot học thuộc quỹ đạo mù. Thống kê action cũng khác: `waist_yaw` trong dataset IK luôn bằng 0
      (q01 = q99 = 0), còn trong dataset đổi phía dao động tới ±0.6 rad.
    - Để lần fine-tune `g1_can_sort_ik` (đang chạy 24/09) chạy xong; checkpoint đó là mốc đối chứng A.
-   - Tải `g1_can_sort_swap.zip` và `g1_can_sort_swap_test.zip` lên `MyDrive/gr00t/`, đặt `DATASET_NAME = "g1_can_sort_swap"`,
-     `TEST_DATASET_NAME = "g1_can_sort_swap_test"`, cùng `MAX_STEPS`/batch với lần IK (checkpoint B).
+   - **Sinh lại** với `hold` 2.5 s (mục 5.2d) thành `g1_can_sort_swap_hold` / `g1_can_sort_swap_hold_test`. Tải zip lên
+     `MyDrive/gr00t/`, đặt `DATASET_NAME`/`TEST_DATASET_NAME` tương ứng, batch 64, `MAX_STEPS` ≈ 12 500 (checkpoint B, xem mục 5.2d-bis).
    - So closed-loop A và B trên cả `g1_can_sort_ik_test` lẫn `g1_can_sort_swap_test`. Dự đoán A hỏng ở ca đổi phía (lối tắt
      "lệnh Coca → tay phải → lon bên phải"). B cần giữ được kết quả ở ca cùng phía.
 6. Plan mở rộng vùng gắp (mục 6): Phase 1 → 2 → 3.
@@ -627,6 +770,7 @@ systemd-inhibit --what=sleep:idle --who=me --why="collect" <lệnh>
 | `g1_can_sort_pilot` / `g1_can_sort_test` | `datasets/` + zip, Drive `MyDrive/gr00t/` | quỹ đạo mẫu, lon ±2 cm (mục 4.1) |
 | `g1_can_sort_ik` / `g1_can_sort_ik_test` | `datasets/` + zip, Drive (đang fine-tune 24/09) | IK online, lon đứng/nằm, vùng rộng (mục 4.4) |
 | `g1_can_sort_swap` / `g1_can_sort_swap_test` | `datasets/` + zip (chưa lên Drive tới 24/09) | như IK + khoảng 1/2 episode lon đổi phía (mục 4.5) |
+| `g1_can_sort_swap_hold` / `..._test` | `datasets/` + zip (24/09) | như swap, hold 2.5 s, 233 khung/ep (mục 5.2d-bis); dataset train checkpoint B |
 | `g1_can_sort_pilot/checkpoint-5000` | Drive `MyDrive/gr00t/checkpoints/` | closed-loop 3/10 ở vị trí mặc định (mục 5.1) |
 | `vla_log_ft_2.npz` | gốc repo | log GUI closed-loop pilot (lon Coca bị quét đổ) |
 

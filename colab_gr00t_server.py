@@ -95,6 +95,7 @@ class ScriptedBackend:
     """Quỹ đạo phân loại lon mẫu, không dùng model."""
 
     action_space = "sonic_tokens"
+    model_info = {"model_path": "scripted", "embodiment_tag": None}
 
     def predict(self, task_description: str, frames: list, g1_state: dict, step_progress: float):
         return scripted_sorting_chunk(task_description, step_progress, 40, CYCLE_STEPS).tolist()
@@ -120,6 +121,8 @@ class Gr00tBackend:
         disable_flash_attn_on_pre_ampere()
         from gr00t.policy.gr00t_policy import Gr00tPolicy
 
+        # Gửi kèm mỗi phản hồi để client kiểm tra đúng checkpoint (đường dẫn gốc, trước khi tải từ HuggingFace)
+        self.model_info = {"model_path": model_path, "embodiment_tag": embodiment_tag}
         if not os.path.isdir(model_path):
             from huggingface_hub import snapshot_download
             print(f"[Colab Server] Đang tải checkpoint {model_path} từ HuggingFace...")
@@ -232,6 +235,7 @@ class Gr00tColabServer:
                 response = {
                     "action": action,
                     "action_space": self.backend.action_space,
+                    "model": self.backend.model_info,
                     "inference_time_ms": dt_ms,
                     "step": step_count,
                 }

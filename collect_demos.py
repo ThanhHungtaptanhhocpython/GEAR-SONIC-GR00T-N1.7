@@ -257,7 +257,8 @@ def run_episode(job):
     sim, adapter = pipe.sim, pipe.g1_adapter
     d = sim.data
     scratch = mujoco.MjData(sim.model)
-    planner = PickPlacePlanner(sim, ctx["can"])
+    # Dataset cũ không có hold_seconds trong cfg: 0.7 s như trước
+    planner = PickPlacePlanner(sim, ctx["can"], hold_steps=round(cfg.get("hold_seconds", 0.7) * 50))
     frames, states, actions = [], [], []
     rand = sample_randomization(task, seed, cfg)
     base = {"task": task, "seed": seed, "lying": rand["cans"][ctx["can"]]["lying"], "swapped": rand["swapped"]}
@@ -428,6 +429,9 @@ def main():
     parser.add_argument("--can-gap", type=float, default=0.03, help="Khoảng hở tối thiểu giữa hai lon (m)")
     parser.add_argument("--tray-jitter", type=float, default=0.02, help="Lệch tối đa vị trí khay đích (m)")
     parser.add_argument("--joint-noise", type=float, default=0.05, help="Độ lệch chuẩn nhiễu khớp tay ban đầu (rad)")
+    parser.add_argument("--hold-seconds", type=float, default=2.5,
+                        help="Đứng yên ở tư thế ready cuối episode (s), để model học dừng lại sau khi xong việc. "
+                             "Dataset trước 25/09 dùng 0.7 s")
     args = parser.parse_args()
 
     out = Path(args.out)
@@ -437,7 +441,7 @@ def main():
     tmp_dir.mkdir(parents=True)
     cfg = {"can_x": args.can_x, "can_y": args.can_y, "lying_prob": args.lying_prob, "can_gap": args.can_gap,
            "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise, "swap_prob": args.swap_prob,
-           "cross_can_y": args.cross_can_y}
+           "cross_can_y": args.cross_can_y, "hold_seconds": args.hold_seconds}
 
     # Chạy xen kẽ hai nhiệm vụ; số lần thử mỗi đợt ước theo tỉ lệ thành công đã đo để bù episode thất bại
     kept = {t: [] for t in TASKS}

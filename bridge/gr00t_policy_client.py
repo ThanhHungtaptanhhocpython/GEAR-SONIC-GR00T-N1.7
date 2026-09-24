@@ -123,6 +123,8 @@ class Gr00tN17Policy:
 
         # Không gian action của phản hồi gần nhất từ server (None khi chưa nhận được phản hồi nào)
         self.server_action_space: Optional[str] = None
+        # {"model_path", "embodiment_tag"} server đang chạy (None nếu server bản cũ không gửi)
+        self.server_model: Optional[dict] = None
         self.zmq_client = None
         if self.mode == "remote":
             self._init_zmq()
@@ -230,6 +232,7 @@ class Gr00tN17Policy:
             return self._fallback(task_description, robot_state, step_progress)
 
         self.server_action_space = response.get("action_space", "sonic_tokens")
+        self.server_model = response.get("model")
         if self.server_action_space == "real_g1":
             return {
                 "action_space": "real_g1",

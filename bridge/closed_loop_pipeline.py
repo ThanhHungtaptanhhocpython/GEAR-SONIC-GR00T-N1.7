@@ -19,6 +19,9 @@ from bridge.sonic_wbc_controller import SonicWBCController
 from bridge.gr00t_policy_client import Gr00tN17Policy
 from bridge.real_g1_adapter import DEFAULT_ACTION_HZ, VIDEO_HISTORY_STEPS, RealG1Adapter
 
+# Số bước 50 Hz trộn từ mục tiêu điều khiển hiện tại sang đường về ready khi bắt đầu giữ (hold_ready)
+HOLD_BLEND_STEPS = 50
+
 
 class ClosedLoopVLAPipeline:
     """Bộ điều phối vòng lặp khép kín VLA + WBC + MuJoCo cho Unitree G1."""
@@ -77,6 +80,10 @@ class ClosedLoopVLAPipeline:
         self.pending_prompt: Optional[str] = None
         self.render_failures = 0
         self.is_paused = False
+        # Giữ tư thế ready (không gọi model) sau khi xong nhiệm vụ: None khi không giữ
+        self.hold_from: Optional[np.ndarray] = None
+        self.hold_path: list = []
+        self.hold_step = 0
 
     def set_task_prompt(self, new_prompt: str):
         """Thay đổi câu lệnh nhiệm vụ ngôn ngữ trong thời gian thực.
@@ -111,6 +118,7 @@ class ClosedLoopVLAPipeline:
         self.chunk_step_idx = 0
         self.task_step = 0
         self.current_action_chunk = None
+        self.hold_from = None
         print(f"\n[VLA Pipeline] Đã chuyển đổi nhiệm vụ sang: '{self.task_prompt}'")
 
     def reset(self):
@@ -122,8 +130,21 @@ class ClosedLoopVLAPipeline:
         self.chunk_step_idx = 0
         self.total_steps_executed = 0
         self.task_step = 0
+        self.hold_from = None
         if self.pending_prompt is not None:
             self._apply_task_prompt(self.pending_prompt)
+
+    @property
+    def holding_ready(self) -> bool:
+        return self.hold_from is not None
+
+    def hold_ready(self, path: Optional[list] = None):
+        """Ngừng gọi model và đi theo `path` (mục tiêu actuator 50 Hz, ví dụ PickPlacePlanner.return_to_ready) rồi giữ
+        mục tiêu cuối, tới khi reset hoặc đổi nhiệm vụ. Không có path thì nội suy thẳng về tư thế ready. Đầu đường đi
+        được trộn dần từ mục tiêu hiện tại trong HOLD_BLEND_STEPS bước."""
+        self.hold_from = self.wbc.last_ctrl.copy()
+        self.hold_path = list(path) if path else [self.sim.default_ctrl.copy()]
+        self.hold_step = 0
 
     def step_50hz(self, physics_lock: Optional[Callable[[], ContextManager]] = None) -> Dict[str, Any]:
         """Thực thi một chu kỳ điều khiển 50 Hz (20 ms).
@@ -146,6 +167,26 @@ class ClosedLoopVLAPipeline:
         # Nhiệm vụ bị hoãn vì đang cầm lon được áp dụng khi nhiệm vụ hiện tại xong
         if self.pending_prompt is not None and self.task_done:
             self._apply_task_prompt(self.pending_prompt)
+
+        if self.hold_from is not None:
+            w = min(self.hold_step / HOLD_BLEND_STEPS, 1.0)
+            w = w * w * (3.0 - 2.0 * w)
+            target = self.hold_path[min(self.hold_step, len(self.hold_path) - 1)]
+            motor_targets = self.wbc.track_joint_targets((1.0 - w) * self.hold_from + w * target)
+            with lock():
+                self.sim.step(motor_targets, n_substeps=self.substeps_per_wbc)
+            self.hold_step += 1
+            self.total_steps_executed += 1
+            return {
+                "paused": False,
+                "holding": True,
+                "sim_time": self.sim.data.time,
+                "motor_targets": motor_targets,
+                "coke_pos": self.sim.data.qpos[self.sim.coke_adr : self.sim.coke_adr + 3].copy(),
+                "pepsi_pos": self.sim.data.qpos[self.sim.pepsi_adr : self.sim.pepsi_adr + 3].copy(),
+                "chunk_idx": self.chunk_step_idx,
+                "total_steps": self.total_steps_executed,
+            }
 
         # 1. Thu nhận trạng thái khớp @ 50 Hz (siêu nhanh, không tốn chi phí render)
         robot_state = self.sim.get_state()
