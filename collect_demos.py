@@ -27,6 +27,7 @@ import sys
 import time
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Optional
 
 os.environ.setdefault("MUJOCO_GL", "egl")
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -153,15 +154,19 @@ def sample_randomization(task: str, seed: int, cfg: dict) -> dict:
     return {"tray": tray, "cans": cans, "joints": joints}
 
 
-def setup_episode(task: str, seed: int, cfg: dict):
-    """Tạo pipeline và áp dụng ngẫu nhiên hoá của episode (tái tạo được từ task + seed + cfg)."""
+def setup_episode(task: str, seed: int, cfg: dict, pipeline_kwargs: Optional[dict] = None):
+    """Tạo pipeline và áp dụng ngẫu nhiên hoá của episode (tái tạo được từ task + seed + cfg).
+
+    pipeline_kwargs: tham số thêm cho ClosedLoopVLAPipeline (ví dụ policy_mode="remote" khi đánh giá model).
+    """
     import mujoco
 
     from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
 
     rand = sample_randomization(task, seed, cfg)
+    kwargs = {"policy_mode": "standalone", **(pipeline_kwargs or {})}
     with contextlib.redirect_stdout(io.StringIO()):
-        pipe = ClosedLoopVLAPipeline(task_prompt=TASKS[task], policy_mode="standalone")
+        pipe = ClosedLoopVLAPipeline(task_prompt=TASKS[task], **kwargs)
     sim, adapter = pipe.sim, pipe.g1_adapter
     m, d = sim.model, sim.data
     can, other = _task_can(task)
