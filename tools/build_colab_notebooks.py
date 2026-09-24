@@ -121,8 +121,10 @@ Notebook chạy model **GR00T N1.7 thật** trên GPU Colab và nối với mô 
 
 ### Các bước
 1. **Runtime → Change runtime type → L4 GPU** (hoặc A100).
-2. Chạy lần lượt từ Bước 1 đến Bước 6. Ở Bước 6 chọn checkpoint.
-3. Copy lệnh in ra ở Bước 4 sang terminal máy local.
+2. Chạy lần lượt từ Bước 1 đến Bước 6. Cell `%%writefile` (Bước 4) ghi file server. Ở Bước 5 chọn checkpoint; server **chạy nền**.
+3. Copy lệnh in ra ở Bước 6 sang terminal máy local.
+4. Tunnel Pinggy miễn phí hết hạn sau khoảng 60 phút: chạy lại Bước 6 để lấy host/port mới, không cần nạp lại model.
+   Bước 7 xem trạng thái và log server; Bước 8 dừng server.
 
 Với checkpoint base, model chưa từng thấy cảnh sim này nên robot sẽ cử động nhưng gần như chắc chắn không gắp được lon.
 
@@ -131,18 +133,102 @@ Isaac-GR00T được ghim ở commit `{ISAAC_COMMIT[:7]}`.
         GPU_CELL,
         INSTALL_CELL,
         HF_TOKEN_CELL,
-        code("""
-# [BƯỚC 4] Mở đường hầm TCP Pinggy qua cổng 443 (không cần tài khoản)
-import subprocess, time
+        writefile("/content/colab_gr00t_server.py", ROOT / "colab_gr00t_server.py"),
+        code(r"""
+# [BƯỚC 5] Khởi chạy PolicyServer chạy nền (port 5550), log ghi ra /content/server.log.
+# Cell chờ tới khi server sẵn sàng. Bấm ■ chỉ dừng việc chờ, server vẫn chạy; xem trạng thái ở Bước 7, dừng ở Bước 8.
+# Checkpoint base: lần đầu tải GR00T-N1.7-3B (~7 GB) và backbone Cosmos-Reason2-2B.
+# Checkpoint fine-tune: đường dẫn checkpoint-<bước> trên Drive (Bước 10 của colab_gr00t_finetune.ipynb)
+#   MODEL_PATH = "/content/drive/MyDrive/gr00t/checkpoints/g1_can_sort_ik/checkpoint-10000"
+#   (thư mục con = DATASET_NAME lúc fine-tune; checkpoint pilot cũ: .../g1_can_sort_pilot/checkpoint-5000)
+#   EMBODIMENT_TAG = "new_embodiment"
+# Checkpoint trên Drive được chép về /content/ckpt trước: nạp thẳng từ Drive rất chậm (~13 phút cho 3 shard),
+# nạp từ đĩa local nhanh hơn nhiều. Lần chạy sau trên cùng runtime bỏ qua các file đã chép đủ.
+# POLICY = "scripted" để phục vụ quỹ đạo mẫu thay cho model.
+MODEL_PATH = "nvidia/GR00T-N1.7-3B"
+EMBODIMENT_TAG = "real_g1_relative_eef_relative_joints"
+POLICY = "gr00t"
+
+import os, re, shutil, socket, subprocess, time
+""" + VENV_CHECK + r"""
+
+
+def port_open(port=5550):
+    with socket.socket() as s:
+        s.settimeout(1)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+assert not port_open(), "Port 5550 đang có server chạy. Dừng bằng Bước 8 rồi chạy lại cell này."
+
+if MODEL_PATH.startswith("/content/drive"):
+    from google.colab import drive
+    drive.mount("/content/drive")
+    assert os.path.isdir(MODEL_PATH), f"Không thấy checkpoint {MODEL_PATH}"
+    local = "/content/ckpt/" + "_".join(MODEL_PATH.rstrip("/").split("/")[-2:])
+    for root, _, files in os.walk(MODEL_PATH):
+        for name in sorted(files):
+            src = os.path.join(root, name)
+            dst = os.path.join(local, os.path.relpath(src, MODEL_PATH))
+            size = os.path.getsize(src)
+            if os.path.exists(dst) and os.path.getsize(dst) == size:
+                continue
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            t0 = time.time()
+            shutil.copyfile(src, dst + ".part")
+            os.replace(dst + ".part", dst)
+            if size > 100e6:
+                dt = time.time() - t0
+                print(f"  chép {os.path.relpath(src, MODEL_PATH)}: {size / 1e9:.2f} GB, {dt:.0f} s ({size / 1e6 / max(dt, 1e-3):.0f} MB/s)")
+    print(f"Checkpoint local: {local}")
+    MODEL_PATH = local
+
+SERVER_LOG = "/content/server.log"
+server_proc = subprocess.Popen(
+    ["/content/Isaac-GR00T/.venv/bin/python", "/content/colab_gr00t_server.py", "--port", "5550",
+     "--policy", POLICY, "--model-path", MODEL_PATH, "--embodiment-tag", EMBODIMENT_TAG],
+    cwd="/content/Isaac-GR00T", stdout=open(SERVER_LOG, "w"), stderr=subprocess.STDOUT,
+    env={**os.environ, "PYTHONUNBUFFERED": "1"}, start_new_session=True)
+print(f"Đã khởi động server (PID {server_proc.pid}). Log: {SERVER_LOG}. Đang chờ server sẵn sàng...")
+
+t0, last = time.time(), ""
+while True:
+    log = open(SERVER_LOG, errors="replace").read()
+    if "ĐANG LẮNG NGHE" in log:
+        warmup = re.search(r"Warm-up xong trong [\d.]+s", log)
+        print(f"✅ Server sẵn sàng sau {time.time() - t0:.0f} s" + (f" ({warmup.group(0)})." if warmup else "."))
+        print("Mở tunnel ở Bước 6 (nếu tunnel cũ còn hạn thì dùng tiếp host/port cũ).")
+        break
+    if server_proc.poll() is not None:
+        print(log[-4000:])
+        raise RuntimeError(f"Server đã thoát (mã {server_proc.returncode}); xem log ở trên.")
+    tail = re.split(r"[\r\n]+", log.strip())[-1][:160] if log.strip() else ""
+    if tail and tail != last:
+        print(f"[{time.time() - t0:4.0f} s] {tail}")
+        last = tail
+    time.sleep(15)
+"""),
+        code(r"""
+# [BƯỚC 6] Mở đường hầm TCP Pinggy qua cổng 443 (không cần tài khoản).
+# Tunnel miễn phí hết hạn sau khoảng 60 phút: chạy lại cell này để lấy host/port mới, server không cần khởi động lại.
+import socket, subprocess, time
+
+if "tunnel_proc" in globals() and tunnel_proc.poll() is None:
+    tunnel_proc.terminate()
+    print("Đã đóng tunnel cũ.")
+with socket.socket() as s:
+    s.settimeout(1)
+    if s.connect_ex(("127.0.0.1", 5550)) != 0:
+        print("⚠️ Chưa có server ở port 5550 (Bước 5 chưa chạy xong). Tunnel vẫn mở được, nhưng local sẽ chưa kết nối được.")
 
 cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=30", "-p", "443", "-R0:localhost:5550", "tcp@free.pinggy.io"]
-proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+tunnel_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 print("Đang mở đường hầm TCP qua Pinggy cổng 443...")
 time.sleep(3)
 pub_url = None
 for _ in range(30):
-    line = proc.stdout.readline()
+    line = tunnel_proc.stdout.readline()
     if not line:
         time.sleep(0.2)
         continue
@@ -153,32 +239,40 @@ for _ in range(30):
 if pub_url and ":" in pub_url:
     host, port = pub_url.split(":")
     print("=" * 75)
-    print(f"🎉 Đường hầm TCP: tcp://{pub_url}")
+    print(f"🎉 Đường hầm TCP: tcp://{pub_url} (mở lúc {time.strftime('%H:%M')}, hết hạn khoảng {time.strftime('%H:%M', time.localtime(time.time() + 3600))})")
     print("=" * 75)
-    print("👉 LỆNH CHẠY TRÊN TERMINAL MÁY LOCAL:")
+    print("👉 ĐÁNH GIÁ CLOSED-LOOP (terminal máy local):")
+    print(f".venv/bin/python tools/eval_closed_loop.py --host {host} --port {port} --dataset datasets/g1_can_sort_ik_test --out eval/<tên>")
+    print("👉 XEM TRỰC QUAN TRONG GUI:")
     print(f".venv/bin/python launch_vla_simulation.py --policy-mode remote --server-host {host} --server-port {port} --server-timeout-ms 10000")
     print("   Với checkpoint fine-tune từ dataset collect_demos.py (ghi ở 25 Hz), thêm: --vla-action-hz 25")
     print("=" * 75)
 else:
     print("Chưa đọc được địa chỉ tunnel; tunnel vẫn chạy nền. Chạy lại cell này nếu cần.")
 """),
-        writefile("/content/colab_gr00t_server.py", ROOT / "colab_gr00t_server.py"),
-        code(f"""
-# [BƯỚC 6] Khởi chạy PolicyServer bằng Python của môi trường Isaac-GR00T (port 5550).
-# Checkpoint base: lần đầu tải GR00T-N1.7-3B (~7 GB) và backbone Cosmos-Reason2-2B.
-# Checkpoint fine-tune: đường dẫn checkpoint-<bước> trên Drive (Bước 10 của colab_gr00t_finetune.ipynb)
-#   MODEL_PATH = "/content/drive/MyDrive/gr00t/checkpoints/g1_can_sort_pilot/checkpoint-5000"
-#   EMBODIMENT_TAG = "new_embodiment"
-# Thêm --policy scripted để phục vụ quỹ đạo mẫu thay cho model.
-MODEL_PATH = "nvidia/GR00T-N1.7-3B"
-EMBODIMENT_TAG = "real_g1_relative_eef_relative_joints"
-
-import os
-{VENV_CHECK}
-if MODEL_PATH.startswith("/content/drive"):
-    from google.colab import drive
-    drive.mount("/content/drive")
-!cd /content/Isaac-GR00T && .venv/bin/python /content/colab_gr00t_server.py --port 5550 --model-path "{{MODEL_PATH}}" --embodiment-tag "{{EMBODIMENT_TAG}}"
+        code(r"""
+# [BƯỚC 7] Trạng thái server: chạy lại bất cứ lúc nào để xem số request, thời gian suy luận và cuối log.
+import os, re, socket
+log = open("/content/server.log", errors="replace").read() if os.path.exists("/content/server.log") else ""
+with socket.socket() as s:
+    s.settimeout(1)
+    listening = s.connect_ex(("127.0.0.1", 5550)) == 0
+print("Server:", "đang lắng nghe ở port 5550" if listening else "KHÔNG chạy")
+reqs = re.findall(r"^\[(\d+)\] .*suy luận (\d+) ms", log, re.M)
+if reqs:
+    ms = [int(m) for _, m in reqs[-50:]]
+    print(f"Đã phục vụ {reqs[-1][0]} request; suy luận TB {sum(ms) / len(ms):.0f} ms (50 request gần nhất).")
+print(f"Lỗi (Traceback) trong log: {log.count('Traceback')}")
+print("--- cuối log ---")
+print("\n".join(re.split(r"[\r\n]+", log.strip())[-15:]))
+"""),
+        code(r"""
+# [BƯỚC 8] Dừng server (ví dụ để đổi checkpoint ở Bước 5). Tunnel giữ nguyên.
+import subprocess, time
+subprocess.run(["pkill", "-f", "colab_gr00t_server.py"])
+time.sleep(3)
+print("Đã dừng server." if subprocess.run(["pgrep", "-f", "colab_gr00t_server.py"], capture_output=True).returncode
+      else "⚠️ Server vẫn còn chạy; chạy lại cell này.")
 """),
     ]
 
@@ -193,14 +287,14 @@ Fine-tune `nvidia/GR00T-N1.7-3B` trên dataset demo sim do `collect_demos.py` t�
 ### Yêu cầu
 * **GPU A100.** Fine-tune mặc định (projector + action head, không tune backbone) cần khoảng 35 GB VRAM. Nếu hết bộ nhớ, giảm `GLOBAL_BATCH_SIZE` ở Bước 4.
 * **HuggingFace:** quyền truy cập repo gated `nvidia/Cosmos-Reason2-2B`, token trong **Colab Secrets** tên `HF_TOKEN`.
-* **Google Drive:** file dataset nén `.zip` (mặc định `MyDrive/gr00t/g1_can_sort_pilot.zip`). Checkpoint cuối được chép về `MyDrive/gr00t/checkpoints/`, cần khoảng 10–15 GB trống.
+* **Google Drive:** file dataset nén `.zip` trong `MyDrive/gr00t/` (mặc định `g1_can_sort_ik.zip`, đổi bằng `DATASET_NAME` ở Bước 4). Checkpoint cuối được chép về `MyDrive/gr00t/checkpoints/<DATASET_NAME>/`, cần khoảng 10–15 GB trống.
 
 ### Tạo file zip ở máy local
 ```bash
-.venv/bin/python -c "import shutil; shutil.make_archive('datasets/g1_can_sort_pilot', 'zip', 'datasets', 'g1_can_sort_pilot')"
+.venv/bin/python -c "import shutil; shutil.make_archive('datasets/g1_can_sort_ik', 'zip', 'datasets', 'g1_can_sort_ik')"
 ```
-rồi tải `datasets/g1_can_sort_pilot.zip` lên thư mục `gr00t` trong Google Drive.
-Để đánh giá tổng quát hoá (Bước 11), tải thêm `datasets/g1_can_sort_test.zip` (tạo bằng `collect_demos.py --out datasets/g1_can_sort_test --episodes-per-task 20 --seed 100000`) vào cùng thư mục.
+rồi tải `datasets/g1_can_sort_ik.zip` lên thư mục `gr00t` trong Google Drive.
+Để đánh giá tổng quát hoá (Bước 11), tải thêm tập test `datasets/g1_can_sort_ik_test.zip` (tạo bằng `collect_demos.py --out datasets/g1_can_sort_ik_test --episodes-per-task 20 --seed 100000`, tên đặt ở `TEST_DATASET_NAME`) vào cùng thư mục.
 
 ### Lưu ý
 * Checkpoint trong lúc train lưu ở ổ đĩa tạm `/content/outputs`. Nếu runtime bị ngắt giữa chừng thì mất, nên Bước 10 chép checkpoint cuối về Drive.
@@ -216,12 +310,18 @@ from google.colab import drive
 
 drive.mount("/content/drive")
 DRIVE_DIR = "/content/drive/MyDrive/gr00t"
+# Tên dataset = tên file zip trên Drive (không có .zip) = tên thư mục bên trong zip.
+# Checkpoint lưu theo tên này: MyDrive/gr00t/checkpoints/<DATASET_NAME>/checkpoint-*
+DATASET_NAME = "g1_can_sort_ik"            # dataset cũ: "g1_can_sort_pilot"
+TEST_DATASET_NAME = "g1_can_sort_ik_test"  # tập test cho Bước 11; dataset cũ: "g1_can_sort_test"
 os.environ.update({
-    "DATASET_ZIP": f"{DRIVE_DIR}/g1_can_sort_pilot.zip",
-    "DATASET_DIR": "/content/datasets/g1_can_sort_pilot",
+    "DATASET_ZIP": f"{DRIVE_DIR}/{DATASET_NAME}.zip",
+    "DATASET_DIR": f"/content/datasets/{DATASET_NAME}",
+    "TEST_ZIP": f"{DRIVE_DIR}/{TEST_DATASET_NAME}.zip",
+    "TEST_DIR": f"/content/datasets/{TEST_DATASET_NAME}",
     "MODALITY_CONFIG": "/content/g1_can_sort_config.py",
     "OUTPUT_DIR": "/content/outputs",
-    "EXPERIMENT": "g1_can_sort_pilot",
+    "EXPERIMENT": DATASET_NAME,
     "DRIVE_CKPT_DIR": f"{DRIVE_DIR}/checkpoints",
     # Tham số train (đọc bởi examples/finetune.sh)
     "NUM_GPUS": "1",
@@ -338,6 +438,94 @@ t = np.linspace(0, 1.5, 24000)
 display(Audio(np.sin(2 * np.pi * 880 * t) * (t % 0.5 < 0.25), rate=16000, autoplay=True))
 """),
         code("""
+# [BƯỚC 8d] Biểu đồ loss, grad norm và learning rate theo bước train. Chạy được trong lúc train (đọc train.log)
+# hoặc sau khi runtime khởi động lại (đọc trainer_state.json trong checkpoint trên ổ tạm hoặc Drive).
+# Ảnh lưu ở $OUTPUT_DIR/loss_curve.png và cạnh checkpoint trên Drive.
+import ast, glob, json, os, re, shutil
+import numpy as np
+import matplotlib.pyplot as plt
+
+def from_train_log(path):
+    # HF Trainer in mỗi lần ghi log dạng {'loss': ..., 'grad_norm': ..., 'learning_rate': ..., 'epoch': ...};
+    # bước của lần ghi lấy từ thanh tiến độ "N/MAX_STEPS [" gần nhất phía trước nó
+    if not os.path.exists(path):
+        return []
+    log = open(path, errors="replace").read()
+    bars = [(m.start(), int(m.group(1))) for m in re.finditer(r"(\\d+)/" + os.environ["MAX_STEPS"] + r" \\[", log)]
+    rows = []
+    for m in re.finditer(r"\\{[^{}]*'loss'[^{}]*\\}", log):
+        try:
+            d = {k: float(v) for k, v in ast.literal_eval(m.group(0)).items()}
+        except (ValueError, SyntaxError, TypeError):
+            continue
+        before = [s for pos, s in bars if pos < m.start()]
+        d["step"] = before[-1] if before else 10 * (len(rows) + 1)
+        rows.append(d)
+    return rows
+
+def from_trainer_state():
+    dirs = [f"{os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}", f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}"]
+    for d in dirs:
+        states = sorted(glob.glob(f"{d}/checkpoint-*/trainer_state.json"),
+                        key=lambda p: int(re.search(r"checkpoint-(\\d+)", p).group(1)))
+        if states:
+            print("Đọc", states[-1])
+            return [e for e in json.load(open(states[-1]))["log_history"] if "loss" in e]
+    return []
+
+rows = from_train_log(f"{os.environ['OUTPUT_DIR']}/train.log") or from_trainer_state()
+assert rows, "Chưa có loss nào: train chưa tới lần ghi log đầu tiên (10 bước), hoặc không thấy train.log / checkpoint."
+
+step = np.array([r["step"] for r in rows], dtype=float)
+series = {k: np.array([r.get(k, np.nan) for r in rows], dtype=float) for k in ("loss", "grad_norm", "learning_rate")}
+loss = series["loss"]
+win = max(5, len(loss) // 20)  # trung bình trượt khoảng 5% số lần ghi
+smooth = np.array([loss[max(0, i - win + 1):i + 1].mean() for i in range(len(loss))])
+
+# Màu: cùng một hue xanh (nhạt = giá trị gốc, đậm = trung bình trượt); chữ và lưới dùng màu trung tính
+BLUE, BLUE_LIGHT, INK, INK_2, GRID = "#2a78d6", "#86b6ef", "#0b0b0b", "#52514e", "#e6e5e1"
+plt.rcParams.update({"axes.edgecolor": GRID, "axes.labelcolor": INK_2, "xtick.color": INK_2, "ytick.color": INK_2,
+                     "axes.titlecolor": INK, "axes.titlesize": 11, "axes.titleweight": "bold", "font.size": 9})
+fig, axes = plt.subplots(3, 1, figsize=(10, 8.5), sharex=True, gridspec_kw={"height_ratios": [2.2, 1, 1]})
+for ax in axes:
+    ax.grid(True, color=GRID, linewidth=0.8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_facecolor("#fcfcfb")
+
+ax = axes[0]
+ax.plot(step, loss, color=BLUE_LIGHT, linewidth=1, label="loss (mỗi lần ghi log)")
+ax.plot(step, smooth, color=BLUE, linewidth=2, label=f"trung bình trượt {win} lần ghi")
+ax.set_yscale("log")
+ax.set_title(f"Loss flow matching – {os.environ['EXPERIMENT']}", loc="left")
+ax.set_ylabel("loss (thang log)")
+ax.legend(frameon=False, loc="upper right", labelcolor=INK_2)
+ax.annotate(f"{smooth[-1]:.4f}", (step[-1], smooth[-1]), xytext=(6, 0), textcoords="offset points",
+            va="center", color=INK, fontweight="bold")
+
+for ax, key, title in ((axes[1], "grad_norm", "Grad norm"), (axes[2], "learning_rate", "Learning rate")):
+    vals = series[key]
+    if np.isfinite(vals).any():
+        ax.plot(step, vals, color=BLUE, linewidth=1.5)
+    else:
+        ax.text(0.5, 0.5, "không có trong log", transform=ax.transAxes, ha="center", color=INK_2)
+    ax.set_title(title, loc="left")
+axes[2].ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
+axes[2].set_xlabel("bước train")
+fig.tight_layout()
+
+png = f"{os.environ['OUTPUT_DIR']}/loss_curve.png"
+fig.savefig(png, dpi=130, facecolor="white")
+plt.show()
+drive_png = f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}/loss_curve.png"
+os.makedirs(os.path.dirname(drive_png), exist_ok=True)
+shutil.copy(png, drive_png)
+
+i_min = int(np.nanargmin(smooth))
+print(f"{len(loss)} lần ghi, bước {int(step[0])}–{int(step[-1])} | loss đầu {loss[0]:.4f} -> cuối (trung bình trượt) "
+      f"{smooth[-1]:.4f}, giảm {loss[0] / smooth[-1]:.0f} lần | thấp nhất {smooth[i_min]:.4f} ở bước {int(step[i_min])}")
+print("Đã lưu:", png, "và", drive_png)
+"""),
+        code("""
 # [BƯỚC 9] Đánh giá open-loop: so action model dự đoán với action trong demo trên vài episode
 # (episode 0 là Coca, episode 1 là Pepsi). Log in MSE/MAE của action; biểu đồ từng episode lưu ở
 # /tmp/open_loop_eval/traj_<id>.jpeg (mở bằng thanh Files bên trái).
@@ -368,20 +556,19 @@ print(f"Đang chép {ckpt} -> {dest} ...")
 shutil.copytree(ckpt, dest, dirs_exist_ok=True)
 size_gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(dest) for f in fs) / 1e9
 print(f"✅ Đã chép ({size_gb:.1f} GB).")
-print(f'Chạy server (Bước 6 của colab_gr00t_server.ipynb): MODEL_PATH = "{dest}", EMBODIMENT_TAG = "new_embodiment"')
+print(f'Chạy server (Bước 5 của colab_gr00t_server.ipynb): MODEL_PATH = "{dest}", EMBODIMENT_TAG = "new_embodiment"')
 print("Ở máy local thêm --vla-action-hz 25.")
 """),
         code("""
 # [BƯỚC 11] Đánh giá open-loop trên tập test độc lập (collect_demos.py --seed 100000, seed không trùng train)
-# và trên cùng số episode của tập train, với checkpoint mới nhất. Cần g1_can_sort_test.zip trên Drive,
-# cùng thư mục với dataset train. Episode chẵn là Coca, lẻ là Pepsi.
-import glob, os, re, subprocess
+# và trên cùng số episode của tập train, với checkpoint mới nhất. Cần file zip tập test (TEST_DATASET_NAME ở
+# Bước 4) trên Drive, cùng thư mục với dataset train. Episode chẵn là Coca, lẻ là Pepsi.
+import glob, json, os, re, subprocess
 import numpy as np
 
-TEST_ZIP = os.path.join(os.path.dirname(os.environ["DATASET_ZIP"]), "g1_can_sort_test.zip")
-TEST_DIR = "/content/datasets/g1_can_sort_test"
+TEST_ZIP, TEST_DIR = os.environ["TEST_ZIP"], os.environ["TEST_DIR"]
 N_EPISODES = 40
-assert os.path.exists(TEST_ZIP), f"Không thấy {TEST_ZIP}: tải datasets/g1_can_sort_test.zip lên Drive trước."
+assert os.path.exists(TEST_ZIP), f"Không thấy {TEST_ZIP}: tải file zip tập test lên Drive trước."
 if not os.path.isdir(TEST_DIR):
     subprocess.run(["unzip", "-q", TEST_ZIP, "-d", os.path.dirname(TEST_DIR)], check=True)
 
@@ -424,8 +611,41 @@ for name, res in results.items():
     for label, parity in (("Coca", 0), ("Pepsi", 1), ("cả hai", None)):
         vals = np.array([v for i, v in res.items() if parity is None or i % 2 == parity])
         print(f"{name:<6}{label:<7}{len(vals):>6}{vals[:, 0].mean():>11.6f}{vals[:, 1].mean():>10.5f}{vals[:, 1].max():>14.5f}")
+
+# Theo lon đứng / nằm (collect_demos.py ghi "lying" vào meta/collection.jsonl; dataset cũ không có thì bỏ qua)
+def lying_of(ds):
+    with open(f"{ds}/meta/collection.jsonl") as f:
+        eps = [json.loads(line) for line in f if line.strip()]
+    return {e["episode_index"]: e["lying"] for e in eps if "lying" in e}
+
+lying = {name: lying_of(ds) for name, ds in (("train", os.environ["DATASET_DIR"]), ("test", TEST_DIR))}
+if all(lying.values()):
+    print(f"\\n{'tập':<6}{'lon':<12}{'số ep':>6}{'MSE TB':>11}{'MAE TB':>10}{'MAE lớn nhất':>14}")
+    for name, res in results.items():
+        for label, want in (("đứng", False), ("nằm", True)):
+            vals = np.array([v for i, v in res.items() if lying[name].get(i) == want])
+            if len(vals):
+                print(f"{name:<6}{label:<12}{len(vals):>6}{vals[:, 0].mean():>11.6f}{vals[:, 1].mean():>10.5f}{vals[:, 1].max():>14.5f}")
+
+# Theo lon cùng phía / đổi phía với khay (collect_demos.py --swap-prob ghi "swapped"; dataset cũ không có thì bỏ qua)
+def swapped_of(ds):
+    with open(f"{ds}/meta/collection.jsonl") as f:
+        eps = [json.loads(line) for line in f if line.strip()]
+    return {e["episode_index"]: e["swapped"] for e in eps if "swapped" in e}
+
+swapped = {name: swapped_of(ds) for name, ds in (("train", os.environ["DATASET_DIR"]), ("test", TEST_DIR))}
+if all(swapped.values()) and any(any(v.values()) for v in swapped.values()):
+    print(f"\\n{'tập':<6}{'lon':<12}{'số ep':>6}{'MSE TB':>11}{'MAE TB':>10}{'MAE lớn nhất':>14}")
+    for name, res in results.items():
+        for label, want in (("cùng phía", False), ("đổi phía", True)):
+            vals = np.array([v for i, v in res.items() if swapped[name].get(i) == want])
+            if len(vals):
+                print(f"{name:<6}{label:<12}{len(vals):>6}{vals[:, 0].mean():>11.6f}{vals[:, 1].mean():>10.5f}{vals[:, 1].max():>14.5f}")
+
 worst = sorted(results["test"].items(), key=lambda kv: -kv[1][1])[:5]
-print("\\nEpisode test có MAE lớn nhất:", ", ".join(f"{i} ({'Coca' if i % 2 == 0 else 'Pepsi'}, {mae:.4f})" for i, (_, mae) in worst))
+kind = lambda i: ("" if i not in lying["test"] else (", nằm" if lying["test"][i] else ", đứng")) + \\
+    (", đổi phía" if swapped["test"].get(i) else "")
+print("\\nEpisode test có MAE lớn nhất:", ", ".join(f"{i} ({'Coca' if i % 2 == 0 else 'Pepsi'}{kind(i)}, {mae:.4f})" for i, (_, mae) in worst))
 """),
     ]
 

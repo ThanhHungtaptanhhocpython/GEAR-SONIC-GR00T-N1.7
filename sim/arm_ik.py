@@ -1,5 +1,6 @@
 """
-Module sim.arm_ik: Động học ngược (IK) cho một cánh tay Unitree G1 (7 khớp) cộng khớp waist_pitch trong MuJoCo.
+Module sim.arm_ik: Động học ngược (IK) cho một cánh tay Unitree G1 (7 khớp) cộng khớp eo (waist_yaw tuỳ chọn,
+waist_pitch) trong MuJoCo.
 
 Giải bằng damped least squares có trọng số, chạy trên một MjData riêng (không đụng tới trạng thái mô phỏng):
 pelvis, chân và các khớp khác giữ nguyên như qpos tham chiếu, chỉ các khớp được chọn thay đổi và bị kẹp trong giới
@@ -54,23 +55,27 @@ def rotation_target(pos: Sequence[float], rot: np.ndarray, weight: float = 1.0) 
 
 
 class ArmIK:
-    """IK cho tay `side` ('left' / 'right') cộng waist_pitch."""
+    """IK cho tay `side` ('left' / 'right') cộng khớp eo; thứ tự khớp: 7 khớp tay, waist_yaw (nếu dùng), waist_pitch
+    (nếu dùng, luôn ở cuối)."""
 
     # Ràng buộc trục có trọng số >= ngưỡng này được coi là cứng khi báo sai số
     HARD_AXIS_WEIGHT = 0.5
     # 1 cm sai số vị trí có trọng số ngang 0.1 rad sai lệch trục
     POS_WEIGHT = 10.0
-    # Trọng số tư thế của waist_pitch so với khớp tay
-    WAIST_POSTURE_SCALE = 5.0
+    # Trọng số tư thế của khớp eo so với khớp tay
+    WAIST_POSTURE_SCALE = {"waist_yaw_joint": 3.0, "waist_pitch_joint": 5.0}
 
     def __init__(self, model: mujoco.MjModel, side: str, point: np.ndarray, use_waist_pitch: bool = True,
                  limit_margin: float = 0.05, waist_pitch_range: Tuple[float, float] = (-0.05, 0.45),
-                 min_shoulder_abduction: float = 0.05, max_wrist_pitch: float = 1.45):
+                 min_shoulder_abduction: float = 0.05, max_wrist_pitch: float = 1.45, use_waist_yaw: bool = False,
+                 waist_yaw_range: Tuple[float, float] = (-0.6, 0.6)):
         self.model = model
         self.side = side
         self.point = np.asarray(point, dtype=np.float64)
         self.wrist_bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{side}_wrist_yaw_link")
         self.joint_names = [f"{side}_{j}_joint" for j in ARM_JOINTS]
+        if use_waist_yaw:
+            self.joint_names.append("waist_yaw_joint")
         if use_waist_pitch:
             self.joint_names.append("waist_pitch_joint")
         jids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, n) for n in self.joint_names]
@@ -78,8 +83,12 @@ class ArmIK:
         self.dadr = model.jnt_dofadr[jids].copy()
         self.lo = model.jnt_range[jids, 0] + limit_margin
         self.hi = model.jnt_range[jids, 1] - limit_margin
-        if use_waist_pitch:
-            self.lo[-1], self.hi[-1] = waist_pitch_range
+        for name, rng in (("waist_yaw_joint", waist_yaw_range), ("waist_pitch_joint", waist_pitch_range)):
+            if name in self.joint_names:
+                i = self.joint_names.index(name)
+                self.lo[i], self.hi[i] = rng
+        # Mảng bool theo khớp: True với các khớp eo
+        self.waist_mask = np.array([n.startswith("waist_") for n in self.joint_names])
         # Vai khép vào trong (shoulder_roll hướng vào thân) quá ~0.1 rad thì bắp tay gần như luôn lồng vào thân:
         # chỉ cho vai giạng ra ngoài ít nhất min_shoulder_abduction (roll dương ở tay trái, âm ở tay phải)
         if side == "left":
@@ -132,20 +141,39 @@ class ArmIK:
     def robot_mask(self) -> np.ndarray:
         return self._robot_body.copy()
 
-    def collides(self, qpos: np.ndarray, q: np.ndarray, obstacles: Optional[np.ndarray] = None) -> bool:
+    def collides(self, qpos: np.ndarray, q: np.ndarray, obstacles: Optional[np.ndarray] = None,
+                 attached: Optional[Tuple[int, int, np.ndarray, np.ndarray]] = None) -> bool:
         """Cánh tay có lồng vào vật cản nào không: các khâu của chính nó, hoặc body có obstacles[body] = True
-        (mặc định: phần còn lại của robot)."""
+        (mặc định: phần còn lại của robot).
+
+        attached: vật đang cầm trên tay (body id, địa chỉ qpos của free joint, vị trí và ma trận quay trong khung cổ
+            tay). Vật được dời theo bàn tay và tính như một khâu của cánh tay (chạm bàn tay thì không tính).
+        """
         m, d = self.model, self.scratch
         obstacles = self._robot_body if obstacles is None else obstacles
         d.qpos[:] = qpos
         d.qpos[self.qadr] = q
+        arm = self._arm_body
+        if attached is not None:
+            bid, adr, pos_local, rot_local = attached
+            mujoco.mj_kinematics(m, d)
+            w_rot = d.xmat[self.wrist_bid].reshape(3, 3)
+            d.qpos[adr:adr + 3] = d.xpos[self.wrist_bid] + w_rot @ pos_local
+            mujoco.mju_mat2Quat(d.qpos[adr + 3:adr + 7], (w_rot @ rot_local).reshape(9))
+            arm = arm.copy()
+            arm[bid] = True
         mujoco.mj_kinematics(m, d)
         mujoco.mj_collision(m, d)
         b1 = m.geom_bodyid[d.contact.geom1[: d.ncon]]
         b2 = m.geom_bodyid[d.contact.geom2[: d.ncon]]
-        arm1, arm2 = self._arm_body[b1], self._arm_body[b2]
+        arm1, arm2 = arm[b1], arm[b2]
         ignored = (np.minimum(b1, b2) == self._ignored_pair[0]) & (np.maximum(b1, b2) == self._ignored_pair[1])
-        return bool(np.any(((arm1 & arm2) | (arm1 & obstacles[b2]) | (arm2 & obstacles[b1])) & ~ignored))
+        if attached is not None:
+            ignored |= (b1 == attached[0]) | (b2 == attached[0])
+            held = ((b1 == attached[0]) & obstacles[b2] & ~arm[b2]) | ((b2 == attached[0]) & obstacles[b1] & ~arm[b1])
+        else:
+            held = np.zeros(len(b1), dtype=bool)
+        return bool(np.any((((arm1 & arm2) | (arm1 & obstacles[b2]) | (arm2 & obstacles[b1])) & ~ignored) | held))
 
     def self_collision(self, qpos: np.ndarray, q: np.ndarray) -> bool:
         """Cánh tay có va chạm với phần khác của robot hay giữa các khâu của chính nó không."""
@@ -174,10 +202,8 @@ class ArmIK:
         point = self.point if point is None else np.asarray(point, np.float64)
         q = np.clip(ref_qpos[self.qadr] if q_init is None else np.asarray(q_init, np.float64), self.lo, self.hi)
         q_nom = q.copy() if q_nominal is None else np.asarray(q_nominal, np.float64)
-        # Số hạng tư thế: eo nặng hơn khớp tay, vì cúi eo dời trọng tâm và làm cả người ngả theo
-        w_post = posture_weight * np.ones(len(q))
-        if self.joint_names[-1] == "waist_pitch_joint":
-            w_post[-1] *= self.WAIST_POSTURE_SCALE
+        # Số hạng tư thế: eo nặng hơn khớp tay, vì cúi/xoay eo dời trọng tâm và làm cả người ngả theo
+        w_post = posture_weight * np.array([self.WAIST_POSTURE_SCALE.get(n, 1.0) for n in self.joint_names])
         eye = np.eye(len(q))
         movable = np.ones(len(q), dtype=bool) if fixed is None else ~np.asarray(fixed, dtype=bool)
         for _ in range(max_iters):
