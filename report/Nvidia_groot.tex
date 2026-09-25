@@ -326,7 +326,7 @@ Có sẵn trong checkpoint & Có, kèm thống kê chuẩn hoá & Không, phải
 
 \subsection{Pipeline tổng thể}
 
-SONIC là bộ điều khiển toàn thân cho Unitree G1 29 khớp, 42 triệu tham số, huấn luyện bằng học tăng cường trong mô phỏng trên hơn 100 triệu khung hình chuyển động của người. Ý tưởng của SONIC là càng tăng quy mô dữ liệu và mô hình cho bài toán bám theo chuyển động thì robot càng cử động tự nhiên và vững vàng. Điểm then chốt là mọi nguồn lệnh, dù là quỹ đạo robot, chuyển động của người, tín hiệu từ kính VR hay đầu ra của một mô hình AI, đều được dịch về cùng một motion token 64 chiều, còn gọi là Universal Token; sau đó một bộ điều khiển duy nhất biến token này thành chuyển động thật trên robot mà vẫn giữ được thăng bằng. Nội dung về SONIC trong báo cáo dựa trên bài báo SONIC~\cite{sonic} và repository GR00T-WholeBodyControl~\cite{wbc}; ví dụ tính toán chi tiết và lệnh chạy nằm trong tài liệu nội bộ \code{SONIC\_ARCHITECTURE\_AND\_ALGORITHMS\_REPORT.md}.
+Unitree G1 có 43 khớp gồm 29 khớp thân và 14 khớp ngón tay; SONIC là bộ điều khiển toàn thân cho 29 khớp thân, 42 triệu tham số, huấn luyện bằng học tăng cường trong mô phỏng trên hơn 100 triệu khung hình chuyển động của người. Ý tưởng của SONIC là càng tăng quy mô dữ liệu và mô hình cho bài toán bám theo chuyển động thì robot càng cử động tự nhiên và vững vàng. Điểm then chốt là mọi nguồn lệnh, dù là quỹ đạo robot, chuyển động của người, tín hiệu từ kính VR hay đầu ra của một mô hình AI, đều được dịch về cùng một motion token 64 chiều, còn gọi là Universal Token; sau đó một bộ điều khiển duy nhất biến token này thành chuyển động thật trên robot mà vẫn giữ được thăng bằng. Nội dung về SONIC trong báo cáo dựa trên bài báo SONIC~\cite{sonic} và repository GR00T-WholeBodyControl~\cite{wbc}; ví dụ tính toán chi tiết và lệnh chạy nằm trong tài liệu nội bộ \code{SONIC\_ARCHITECTURE\_AND\_ALGORITHMS\_REPORT.md}.
 
 Khi đứng riêng, pipeline của SONIC gồm ba khối:
 \begin{enumerate}
@@ -550,7 +550,7 @@ Khi ghép với SONIC, chỉ đầu ra đổi: mỗi khung demo phải có nhãn
 \end{itemize}
 Với nhóm, dữ liệu mô phỏng tự sinh không có token sẵn, phải chạy bộ mã hoá của SONIC trên quỹ đạo khớp để tính. Nhóm đã bọc bộ mã hoá này nhưng chưa kiểm chứng xong cách ghép vector đầu vào, nên dữ liệu hiện tại vẫn theo khai báo \code{REAL\_G1}.
 
-Với đường ghép SONIC, quy trình dùng GR00T gồm ba bước. Đầu tiên, người vận hành dùng kính VR để điều khiển robot làm mẫu một tác vụ khoảng 50 đến 100 lần, và dữ liệu được lưu theo định dạng LeRobot v2.1. Tiếp theo, GR00T N1.7 được fine-tune trên bộ dữ liệu vừa thu dưới tag \code{UNITREE\_G1\_SONIC}. Cuối cùng, robot chạy tự hành, trong đó GR00T suy luận ở 2,5\,Hz và SONIC điều khiển toàn thân ở 50\,Hz.
+Sau khi có dữ liệu, GR00T N1.7 được fine-tune dưới tag \code{UNITREE\_G1\_SONIC} rồi chạy theo pipeline ba tần số ở Mục~ef{sec:combine}.
 
 % ---------------------------------------------------------------------
 \chapter{SO SÁNH VỚI CÁC MÔ HÌNH CÙNG LOẠI}
@@ -606,7 +606,7 @@ Trong dự án của nhóm, quỹ đạo lập trình sẵn chỉ chịu đượ
 % ---------------------------------------------------------------------
 \chapter{KẾT QUẢ THỬ NGHIỆM CỦA NHÓM}
 % ---------------------------------------------------------------------
-Nhóm thử GR00T N1.7 trên mô phỏng MuJoCo với Unitree G1 43 khớp, nhiệm vụ gắp lon Coca-Cola bỏ vào khay đỏ và lon Pepsi bỏ vào khay xanh. Máy cục bộ không có GPU nên mô hình chạy trên Google Colab, mô phỏng chạy cục bộ và nối qua mạng. Ba việc đã làm như sau.
+Nhóm thử GR00T N1.7 trên mô phỏng MuJoCo với Unitree G1, nhiệm vụ gắp lon Coca-Cola bỏ vào khay đỏ và lon Pepsi bỏ vào khay xanh. Máy cục bộ không có GPU nên mô hình chạy trên Google Colab, mô phỏng chạy cục bộ và nối qua mạng. Ba việc đã làm như sau.
 
 \section{Nối GR00T N1.7 với bộ điều khiển toàn thân}
 
