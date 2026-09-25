@@ -10,3 +10,4 @@ datasets/*
 vla_log*.npz
 snapshots/
 eval/
+third_party/

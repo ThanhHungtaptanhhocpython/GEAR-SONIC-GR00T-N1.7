@@ -145,12 +145,14 @@ Isaac-GR00T được ghim ở commit `{ISAAC_COMMIT[:7]}`.
 #   (tools/eval_closed_loop.py mặc định dừng nếu server không chạy checkpoint new_embodiment)
 # Checkpoint trên Drive được chép về /content/ckpt trước: nạp thẳng từ Drive rất chậm (~13 phút cho 3 shard),
 # nạp từ đĩa local nhanh hơn nhiều. Lần chạy sau trên cùng runtime bỏ qua các file đã chép đủ.
+# Lần chép đầu vẫn bị giới hạn bởi tốc độ Drive (~15 MB/s, có thể vài phút mỗi shard); tiến độ in mỗi 30 s.
+# Nếu Drive rớt (Errno 107) thì tự mount lại và chép tiếp từ chỗ dừng; chạy lại cell cũng chép tiếp từ file .part.
 # POLICY = "scripted" để phục vụ quỹ đạo mẫu thay cho model.
 MODEL_PATH = "/content/drive/MyDrive/gr00t/checkpoints/g1_can_sort_ik/checkpoint-10000"
 EMBODIMENT_TAG = "new_embodiment"
 POLICY = "gr00t"
 
-import os, re, shutil, socket, subprocess, time
+import os, re, socket, subprocess, time
 """ + VENV_CHECK + r"""
 
 
@@ -163,24 +165,58 @@ def port_open(port=5550):
 assert not port_open(), "Port 5550 đang có server chạy. Dừng bằng Bước 8 rồi chạy lại cell này."
 
 if MODEL_PATH.startswith("/content/drive"):
+    import errno
     from google.colab import drive
     drive.mount("/content/drive")
     assert os.path.isdir(MODEL_PATH), f"Không thấy checkpoint {MODEL_PATH}"
     local = "/content/ckpt/" + "_".join(MODEL_PATH.rstrip("/").split("/")[-2:])
-    for root, _, files in os.walk(MODEL_PATH):
-        for name in sorted(files):
-            src = os.path.join(root, name)
-            dst = os.path.join(local, os.path.relpath(src, MODEL_PATH))
-            size = os.path.getsize(src)
-            if os.path.exists(dst) and os.path.getsize(dst) == size:
-                continue
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            t0 = time.time()
-            shutil.copyfile(src, dst + ".part")
-            os.replace(dst + ".part", dst)
-            if size > 100e6:
-                dt = time.time() - t0
-                print(f"  chép {os.path.relpath(src, MODEL_PATH)}: {size / 1e9:.2f} GB, {dt:.0f} s ({size / 1e6 / max(dt, 1e-3):.0f} MB/s)")
+    jobs = [(os.path.join(root, name), os.path.getsize(os.path.join(root, name)))
+            for root, _, files in os.walk(MODEL_PATH) for name in sorted(files)]
+    total = sum(size for _, size in jobs)
+    print(f"Checkpoint trên Drive: {len(jobs)} file, {total / 1e9:.2f} GB")
+
+    def copy_resumable(src, dst, size, chunk=64 << 20):
+        # Chép theo khối và nối tiếp vào .part nếu lần trước bị ngắt; in tiến độ mỗi 30 s
+        part = dst + ".part"
+        done = os.path.getsize(part) if os.path.exists(part) else 0
+        t0, t_print, start = time.time(), time.time(), done
+        with open(src, "rb") as fi, open(part, "ab") as fo:
+            fi.seek(done)
+            while done < size:
+                buf = fi.read(chunk)
+                if not buf:
+                    raise OSError(errno.EIO, f"Đọc thiếu {src}: {done}/{size} byte")
+                fo.write(buf)
+                done += len(buf)
+                if time.time() - t_print > 30:
+                    rate = (done - start) / 1e6 / (time.time() - t0)
+                    print(f"    {os.path.basename(src)}: {done / 1e9:.2f}/{size / 1e9:.2f} GB, {rate:.0f} MB/s, "
+                          f"còn khoảng {(size - done) / 1e6 / max(rate, 1e-3) / 60:.1f} phút")
+                    t_print = time.time()
+        os.replace(part, dst)
+        return (done - start) / 1e6 / max(time.time() - t0, 1e-3)
+
+    for src, size in jobs:
+        dst = os.path.join(local, os.path.relpath(src, MODEL_PATH))
+        if os.path.exists(dst) and os.path.getsize(dst) == size:
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if size > 100e6:
+            print(f"  chép {os.path.relpath(src, MODEL_PATH)} ({size / 1e9:.2f} GB)...")
+        for attempt in range(1, 6):
+            try:
+                rate = copy_resumable(src, dst, size)
+                break
+            except OSError as e:
+                # Errno 107 (Transport endpoint is not connected): FUSE của Drive bị rớt khi đọc file lớn.
+                # Mount lại rồi chép tiếp từ chỗ dừng.
+                if e.errno not in (errno.ENOTCONN, errno.EIO) or attempt == 5:
+                    raise
+                print(f"  ⚠️ {e}; mount lại Drive và chép tiếp (lần {attempt + 1}/5)")
+                time.sleep(5)
+                drive.mount("/content/drive", force_remount=True)
+        if size > 100e6:
+            print(f"  xong {os.path.relpath(src, MODEL_PATH)}, {rate:.0f} MB/s")
     print(f"Checkpoint local: {local}")
     MODEL_PATH = local
 

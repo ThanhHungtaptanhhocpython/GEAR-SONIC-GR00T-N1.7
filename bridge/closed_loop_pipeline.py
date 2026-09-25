@@ -39,6 +39,8 @@ class ClosedLoopVLAPipeline:
         vla_action_hz: float = DEFAULT_ACTION_HZ,  # Tần số dữ liệu của action chunk REAL_G1
         server_timeout_ms: int = 3000,
         record_vla_path: Optional[str] = None,  # File .npz ghi state/action/ảnh của mỗi lần gọi model GR00T thật
+        lower_body: str = "fixed",  # "fixed": chân khoá cứng như lúc thu demo; "balance": policy thăng bằng của NVIDIA
+        balance_height: float = 0.82,  # lệnh chiều cao pelvis cho policy thăng bằng (0.82 -> đứng ở ~0.77 m)
     ):
         self.task_prompt = task_prompt
         self.policy_replan_interval = policy_replan_interval
@@ -71,6 +73,16 @@ class ClosedLoopVLAPipeline:
         self.ego_history: collections.deque = collections.deque(maxlen=16)
         self.record_vla_path = record_vla_path
         self.vla_log: list = []
+
+        # Chân: khoá cứng ở tư thế đứng mặc định, hoặc policy thăng bằng điều khiển chân + eo (bridge/lower_body_policy.py)
+        if lower_body not in ("fixed", "balance"):
+            raise ValueError(f"lower_body phải là 'fixed' hoặc 'balance', nhận '{lower_body}'")
+        self.balance = None
+        if lower_body == "balance":
+            from bridge.lower_body_policy import BalancePolicy
+            self.balance = BalancePolicy(self.sim, height_cmd=balance_height)
+            self.balance.apply_gains()
+            self._init_balance()
 
         # Trạng thái vòng lặp
         self.current_action_chunk: Optional[Dict[str, np.ndarray]] = None
@@ -125,6 +137,8 @@ class ClosedLoopVLAPipeline:
         """Khôi phục toàn bộ hệ thống về trạng thái ban đầu."""
         self.sim.reset()
         self.wbc.reset()
+        if self.balance is not None:
+            self._init_balance()
         self.ego_history.clear()
         self.current_action_chunk = None
         self.chunk_step_idx = 0
@@ -133,6 +147,22 @@ class ClosedLoopVLAPipeline:
         self.hold_from = None
         if self.pending_prompt is not None:
             self._apply_task_prompt(self.pending_prompt)
+
+    def _init_balance(self):
+        """Đặt chân vào tư thế của policy thăng bằng, cho đứng vững 2 s ở tư thế ready rồi dời về vị trí ban đầu."""
+        self.balance.reset()
+        self.balance.init_pose()
+        self.balance.settle(self.sim.default_ctrl, substeps=self.substeps_per_wbc)
+        self.sim.data.time = 0.0
+
+    def _lower_body(self, motor_targets: np.ndarray) -> np.ndarray:
+        """Chế độ balance: thay mục tiêu 12 khớp chân + 3 khớp eo bằng output của policy thăng bằng. Góc eo mà VLA ra
+        lệnh được đổi thành hướng thân mong muốn cho policy (như decoupled WBC của NVIDIA)."""
+        if self.balance is None:
+            return motor_targets
+        out = np.asarray(motor_targets, dtype=np.float32).copy()
+        out[:15] = self.balance(out[12:15])
+        return out
 
     @property
     def holding_ready(self) -> bool:
@@ -161,7 +191,7 @@ class ClosedLoopVLAPipeline:
         if self.is_paused:
             # Nếu tạm dừng, duy trì vị trí hiện tại
             with lock():
-                self.sim.step(self.wbc.last_ctrl, n_substeps=self.substeps_per_wbc)
+                self.sim.step(self._lower_body(self.wbc.last_ctrl), n_substeps=self.substeps_per_wbc)
             return {"paused": True}
 
         # Nhiệm vụ bị hoãn vì đang cầm lon được áp dụng khi nhiệm vụ hiện tại xong
@@ -172,7 +202,7 @@ class ClosedLoopVLAPipeline:
             w = min(self.hold_step / HOLD_BLEND_STEPS, 1.0)
             w = w * w * (3.0 - 2.0 * w)
             target = self.hold_path[min(self.hold_step, len(self.hold_path) - 1)]
-            motor_targets = self.wbc.track_joint_targets((1.0 - w) * self.hold_from + w * target)
+            motor_targets = self._lower_body(self.wbc.track_joint_targets((1.0 - w) * self.hold_from + w * target))
             with lock():
                 self.sim.step(motor_targets, n_substeps=self.substeps_per_wbc)
             self.hold_step += 1
@@ -236,6 +266,7 @@ class ClosedLoopVLAPipeline:
             )
 
         # 5. MuJoCo bước 10 substeps (10 x 0.002s = 0.02s ~ 50 Hz)
+        motor_targets = self._lower_body(motor_targets)
         with lock():
             self.sim.step(motor_targets, n_substeps=self.substeps_per_wbc)
 

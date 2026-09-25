@@ -451,6 +451,67 @@ Episode test sai nhiều nhất vẫn là các episode cũ: 27 (Pepsi, nằm, 0.
   ngón hoặc đầu mỗi chunk) vẫn còn nguyên. Cần tách lỗi theo khớp và theo thời gian để biết chính xác.
 - Lon nằm vẫn là điểm yếu: MAE test gấp 1.44 lần lon đứng (ở 5000 là 1.31 lần), và episode 27 gần như không cải thiện.
 
+### 5.0d. Open-loop checkpoint B `g1_can_sort_swap_hold/checkpoint-5000` (24/09, Bước 11, train đang chạy tiếp)
+Train loss ở khoảng bước 5000 là 0.0077 (trung bình trượt; A-5000 khoảng 0.011). Grad norm khoảng 0.3–0.4, không có spike.
+Tập đánh giá là `g1_can_sort_swap_hold(_test)`, không phải tập của A.
+
+| Tập | Nhóm | Số ep | MSE TB | MAE TB | MAE lớn nhất |
+|---|---|---|---|---|---|
+| train | Coca / Pepsi | 20 / 20 | 0.00129 / 0.00183 | 0.0150 / 0.0148 | 0.0304 / 0.0234 |
+| train | cả hai | 40 | 0.00156 | **0.0149** | 0.0304 |
+| test | Coca / Pepsi | 20 / 20 | 0.00163 / 0.00224 | 0.0166 / 0.0162 | 0.0265 / 0.0236 |
+| test | cả hai | 40 | 0.00194 | **0.0164** | 0.0265 |
+| train | đứng / nằm | 19 / 21 | 0.00095 / 0.00212 | 0.0137 / 0.0160 | 0.0208 / 0.0304 |
+| test | đứng / nằm | 12 / 28 | 0.00102 / 0.00233 | 0.0135 / 0.0176 | 0.0168 / 0.0265 |
+| train | cùng / đổi phía | 18 / 22 | 0.00092 / 0.00209 | 0.0134 / 0.0161 | 0.0208 / 0.0304 |
+| test | cùng / đổi phía | 14 / 26 | 0.00150 / 0.00217 | 0.0151 / 0.0171 | 0.0202 / 0.0265 |
+
+Episode test sai nhiều nhất: 8 (Coca, 0.0264), 9, 1, 29, 17 (Pepsi, khoảng 0.022). Cả 5 đều là lon nằm và đổi phía.
+
+**Nhận định:**
+- Con số tốt hơn A-5000 (MAE test 0.0269) và nhỉnh hơn A-10000 (0.0189). MSE test chỉ bằng khoảng 1/3 của A (0.0019 so với
+  0.0054), MAE lớn nhất 0.0265 so với 0.0493.
+- **Không so trực tiếp được.** Tập test khác nhau, và `--steps 400` phủ cả 2.5 s đứng yên (khoảng 19% số khung), vốn dễ đoán.
+  Giả sử khung đứng yên sai số bằng 0, thì MAE trên phần gắp-đặt vào khoảng 0.0164 / 0.81 ≈ 0.020, tức ngang A-10000 và vẫn
+  tốt hơn A-5000.
+- Khoảng cách train–test 10%, giống A-5000, nên chưa học thuộc.
+- Đổi phía khó hơn cùng phía 1.14 lần, lon nằm khó hơn lon đứng 1.31 lần. Hai nhóm này chồng lên nhau nên chưa tách được
+  riêng từng yếu tố.
+- Quyết định: train tiếp tới hết `MAX_STEPS` (checkpoint `--save-only-model` không train tiếp được). So công bằng bằng cách
+  chạy chéo: A-10000 trên `swap_hold_test`, B trên `ik_test`, rồi closed-loop.
+
+### 5.0e. Open-loop checkpoint B `g1_can_sort_swap_hold/checkpoint-7000` (24/09, Bước 11)
+| Tập | Nhóm | Số ep | MSE TB | MAE TB (5000 → 7000) | MAE lớn nhất |
+|---|---|---|---|---|---|
+| train | cả hai | 40 | 0.00069 | 0.0149 → **0.0100** (−33%) | 0.0159 |
+| test | cả hai | 40 | 0.00108 | 0.0164 → **0.0118** (−28%) | 0.0221 |
+| test | Coca / Pepsi | 20 / 20 | 0.00106 / 0.00110 | 0.0119 / 0.0117 | 0.0221 / 0.0192 |
+| train | đứng / nằm | 19 / 21 | 0.00063 / 0.00075 | 0.0096 / 0.0104 | 0.0159 / 0.0153 |
+| test | đứng / nằm | 12 / 28 | 0.00077 / 0.00121 | 0.0102 / 0.0125 | 0.0145 / 0.0221 |
+| train | cùng / đổi phía | 18 / 22 | 0.00060 / 0.00077 | 0.0093 / 0.0106 | 0.0159 / 0.0153 |
+| test | cùng / đổi phía | 14 / 26 | 0.00095 / 0.00114 | 0.0109 / 0.0123 | 0.0157 / 0.0221 |
+
+Episode test sai nhiều nhất: 8 (Coca, nằm, đổi phía, 0.0221; ở 5000 là 0.0264), 1 (Pepsi, nằm, đổi phía, 0.0192),
+30 (Coca, nằm), 20 (Coca, nằm, đổi phía), 13 (Pepsi, đứng, 0.0145).
+
+**Nhận định:**
+- Vẫn tiến bộ mạnh: MAE test −28%, MSE test −44%. Ước lượng bỏ khung đứng yên: 0.0118 / 0.81 ≈ 0.0146, tốt hơn A-10000
+  (0.0189) khoảng 23%, dù tập test khác nhau.
+- Khoảng cách train–test tăng từ 10% lên 18% (A cũng tăng 10% → 27%). Test vẫn giảm nên chưa phải overfit có hại; từ đây theo
+  dõi MAE test ở mỗi checkpoint.
+- Lon nằm / lon đứng trên test giảm từ 1.31 xuống 1.22 lần, nhưng trên train chỉ 1.08 lần. Lỗi lon nằm chủ yếu là lỗi tổng quát hoá.
+  Đổi phía / cùng phía giữ ở 1.13 lần, và đổi phía tổng quát hoá không kém cùng phía (test/train đều khoảng 1.16).
+- **Episode 8 không nằm ngoài phân bố:** lon nằm cách episode train gần nhất 0.4 cm, có 21 episode train cùng nhóm trong bán
+  kính 3 cm, yaw lệch 5°. Trung vị khoảng cách tới láng giềng gần nhất của cả tập test là 0.8 cm.
+- **Lon nằm có hai kiểu gắp:** planner thử hai chiều trục lon (`s = ±1`), 5 độ lệch và 2 trọng số rồi chọn chi phí nhỏ nhất. Ở
+  khung khép tay (luôn là khung 55), wrist pitch rơi vào hai cụm: khoảng +1.0..1.4 (78/225 episode train) hoặc khoảng
+  −0.5..−0.7, cách nhau khoảng 2 rad. Trong 28 episode test lon nằm, 12 episode có 6 láng giềng gần nhất (vị trí + yaw gập theo
+  180°) lẫn cả hai kiểu; lon đứng là 0/12. Ví dụ: test 20 và train 60 lệch 1 cm và 9° nhưng khác nhau 1.9 rad. Ngay trong cùng
+  một kiểu, láng giềng vẫn lệch 0.15–0.6 rad.
+  Kết luận: MAE open-loop của lon nằm có một mức sàn mà train thêm không xoá được. Flow matching vẫn học được phân bố nhiều
+  kiểu, nên closed-loop không nhất thiết bị ảnh hưởng, nhưng nên xem closed-loop có bị lưỡng lự giữa hai kiểu không. Nếu cần
+  thì sửa planner để chọn kiểu một cách liên tục theo yaw (ví dụ cố định dấu `s` theo vùng yaw), rồi sinh lại dữ liệu.
+
 ### 5.1. Closed-loop với checkpoint pilot (23/09)
 Server Colab chạy `g1_can_sort_pilot/checkpoint-5000`, tag `new_embodiment`, qua tunnel Pinggy. Local dùng `--vla-action-hz 25`
 (bắt buộc cho checkpoint fine-tune: mặc định 20 Hz làm chunk chậm 25% và lấy khung hình quá khứ lùi 1.0 s thay vì 0.8 s).
@@ -604,6 +665,45 @@ Lệnh như `g1_can_sort_swap` (`--episodes-per-task 200 --swap-prob 0.7`, cùng
   - Episode 1 (Pepsi): dừng lúc 6.1 s, không gọi model thêm, tay về ready, lon vẫn trong khay.
   - Episode 0: đặt Coca, bấm 2 lúc 10 s, gắp Pepsi, giữ; cả hai lon ở trong khay tới 19 s.
 
+### 5.2f. Chân tự cân bằng: `--lower-body balance` (24/09)
+- **Nguồn:** `third_party/GR00T-WholeBodyControl` (NVlabs, commit `b042411`), sparse checkout gồm `decoupled_wbc/sim2mujoco`,
+  `control/policy`, `control/main/teleop/configs`. Thư mục này nằm trong `.gitignore`.
+  - Máy chưa có git-lfs, nên hai file policy được tải từ
+    `https://media.githubusercontent.com/media/NVlabs/GR00T-WholeBodyControl/<commit>/decoupled_wbc/sim2mujoco/resources/robots/g1/policy/GR00T-WholeBodyControl-{Balance,Walk}.onnx`
+    (1.9 MB mỗi file, sha256 khớp con trỏ LFS).
+  - Mesh STL vẫn là con trỏ LFS; không cần.
+- **Model robot của NVIDIA (`g1_gear_wbc.xml`) so với sim này:** trùng tổng khối lượng (34.39 kg), khối lượng từng khâu,
+  armature, độ cao pelvis 0.793 m và thứ tự 29 khớp. Khác: frictionloss 0.1 so với 0.3, và actuator (họ dùng motor + PD
+  trong Python, sim này dùng position KP 500).
+- **`bridge/lower_body_policy.py` (`BalancePolicy`)** làm theo `run_mujoco_gear_wbc.py` và `g1_decoupled_whole_body_policy.py`:
+  - Quan sát 86 chiều × 6 bước, output 15 (chân + eo), mục tiêu `0.25·a + default`.
+  - KP/KD của NVIDIA chỉ áp cho 15 actuator chân + eo, frictionloss 0.1. Tay và bàn tay giữ KP 500.
+  - Eo: góc eo VLA ra lệnh được đổi (forward kinematics) thành rpy của torso so với pelvis và đưa vào lệnh rpy của
+    policy; policy điều khiển eo.
+  - Lệnh đi = 0, luôn dùng policy Balance. `height_cmd` = 0.82, robot đứng ở ~0.77 m (sim cũ 0.79). Mức 0.74 của NVIDIA
+    cho 0.75 m và nghiêng nhiều hơn.
+  - `init_pose()`: đặt chân vào tư thế mặc định của policy và hạ pelvis để bàn chân chạm sàn. Nếu bắt đầu từ chân thẳng,
+    bàn chân trượt khoảng 3 cm.
+  - `settle()`: cho robot đứng 2 s ở tư thế ready rồi dời về x, y ban đầu. Lý do: policy đẩy pelvis lùi khoảng 7 cm để giữ
+    trọng tâm (eo cúi, tay đưa ra trước); không dời lại thì lon ra ngoài tầm với.
+- **Pipeline:** `ClosedLoopVLAPipeline(lower_body="fixed"|"balance", balance_height=0.82)`. `_lower_body()` thay mục tiêu
+  chân + eo trước mọi `sim.step` (chạy thường, lúc giữ ready, lúc tạm dừng). `reset()` chạy lại `init_pose` + `settle` (0.1 s);
+  reset hai lần cho qpos giống hệt.
+- **Cờ:** `launch_vla_simulation.py --lower-body balance`, `tools/eval_closed_loop.py --lower-body balance` (ghi `lower_body`
+  vào `results.jsonl`). Mặc định `fixed`; thu demo, verify và phát lại không đổi. `verify_pipeline.py` qua đủ 5 test.
+- **Kết quả đo:**
+  - Đứng yên 30 s: nghiêng cuối 0.4° (chân khoá cứng 2.9°), trôi dưới 0.5 cm sau khi ổn định.
+  - Planner IK, 15 seed × 2 lon, cùng seed:
+
+| Chế độ | Thành công đứng / nằm | Nghiêng max TB đứng / nằm | Pelvis dịch max TB |
+|---|---|---|---|
+| fixed | 16/17 / 12/13 | 5.4° / 7.2° (max 11.4°) | 4.8 / 7.3 cm (max 12.8) |
+| balance | 16/17 / 13/13 | 2.3° / 3.1° (max 4.3°) | 2.3 / 2.5 cm |
+
+- **Chưa thử với model thật** (tunnel hết hạn). A/B được train với chân khoá cứng, pelvis ở 0.79 m. Bật balance thì pelvis
+  thấp hơn khoảng 2 cm và còn dịch vài cm khi vươn tay, nên ảnh camera khác một chút. Cần chạy
+  `eval_closed_loop --lower-body balance` và so với `fixed` trên cùng tập test.
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel
@@ -630,6 +730,15 @@ Lệnh như `g1_can_sort_swap` (`--episodes-per-task 200 --swap-prob 0.7`, cùng
   - Đã thử với server giả: embodiment REAL_G1 thì script dừng kèm thông báo, `new_embodiment` thì chạy bình thường;
     `verify_pipeline.py` qua cả 5 test. Server bản cũ không gửi `model` thì script chỉ cảnh báo.
 - Tốc độ chép Drive → local trên Colab chưa đo; xem số MB/s in ra ở Bước 5 lần tới.
+- **25/09: Bước 5 chạy rất lâu mà không in gì, lần trước còn lỗi `OSError: [Errno 107] Transport endpoint is not connected`.**
+  - Chậm: bản cũ chỉ in sau khi chép xong từng shard. Với khoảng 15 MB/s, mỗi shard vài GB mất vài phút, nên cell đứng im
+    ở dòng "Mounted at /content/drive". Checkpoint vừa ghi từ runtime train phải tải lại từ cloud nên không có cache.
+  - Errno 107: FUSE của Drive bị rớt khi đọc file lớn. Bản cũ dừng hẳn, phải mount lại tay và chép lại từ đầu.
+  - Sửa (`tools/build_colab_notebooks.py`, sinh lại `colab_gr00t_server.ipynb`):
+    - In tổng dung lượng lúc đầu, rồi in tiến độ, MB/s và thời gian còn lại mỗi 30 s.
+    - Chép theo khối 64 MB vào `.part` và nối tiếp nếu bị ngắt.
+    - Gặp Errno 107 hoặc EIO thì `drive.mount(force_remount=True)` rồi chép tiếp, tối đa 5 lần.
+  - Đã thử local với Drive giả, bị rớt 2 lần giữa shard: chép tiếp đúng, md5 khớp.
 
 ---
 

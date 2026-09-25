@@ -20,6 +20,9 @@ Mặc định lon ở vị trí cố định trong scene XML. Muốn đặt cả
                                           (--swap-prob, --lying-prob chỉnh cách lấy mẫu)
   --scene-dataset DIR --scene-episode K : dựng lại đúng cảnh của episode K trong dataset (kể cả nhiệm vụ)
 
+--lower-body balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều khiển chân + eo (robot tự đứng vững,
+ngả ~2-3° thay vì 5-11° khi vươn tay); mặc định fixed: chân khoá cứng như lúc thu demo.
+
 Mặc định (--stop-on-success) khi lon đã nằm trong đúng khay và tay đã nhả, chờ tay về gần tư thế ready rồi ngừng gọi
 model và giữ nguyên tư thế ready, tới khi bấm F10 / F11 / F8 / F9. --no-stop-on-success để model chạy liên tục.
 """
@@ -231,6 +234,9 @@ def main():
         choices=["kinematic", "onnx"],
         help="Chế độ giải mã WBC: kinematic (đứng vững & gắp lon ổn định, mặc định) hoặc onnx (mạng nơ-ron GEAR-SONIC).",
     )
+    parser.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
+                        help="fixed: chân khoá cứng như lúc thu demo (mặc định); balance: policy thăng bằng của NVIDIA "
+                             "GR00T-WholeBodyControl điều khiển chân + eo (bridge/lower_body_policy.py)")
     parser.add_argument("--stop-on-success", action=argparse.BooleanOptionalAction, default=True,
                         help="Đặt xong lon thì ngừng gọi model, giữ tư thế ready tới khi bấm R/N/1/2 (mặc định bật)")
     args = parser.parse_args()
@@ -277,6 +283,7 @@ def main():
     print(f"  * Nhiệm vụ ban đầu : {init_prompt}")
     print(f"  * Chế độ Policy    : {args.policy_mode.upper()}")
     print(f"  * Chế độ WBC       : {args.wbc_mode.upper()} (Đứng vững & Thao tác)")
+    print(f"  * Chân             : {'policy thăng bằng NVIDIA' if args.lower_body == 'balance' else 'khoá cứng'}")
     if args.policy_mode == "remote":
         print(f"  * PolicyServer     : tcp://{args.server_host}:{args.server_port}")
     print("=" * 70)
@@ -291,6 +298,7 @@ def main():
         vla_action_hz=args.vla_action_hz,
         server_timeout_ms=args.server_timeout_ms,
         record_vla_path=args.record_vla,
+        lower_body=args.lower_body,
     )
 
     def apply_scene():

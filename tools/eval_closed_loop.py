@@ -72,7 +72,7 @@ def run_episode(job) -> dict:
     from PIL import Image
 
     pipe_kwargs = {"policy_mode": "remote", "server_host": args["host"], "server_port": args["port"],
-                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"]}
+                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": args["lower_body"]}
     pipe, ctx = cd.setup_episode(task, seed, cfg, pipeline_kwargs=pipe_kwargs)
     sim, policy = pipe.sim, pipe.policy
     if policy.mode != "remote":
@@ -150,7 +150,7 @@ def run_episode(job) -> dict:
         "other_moved_cm": round(float(np.linalg.norm(d.qpos[other_adr:other_adr + 3] - ctx["other_start"])) * 100, 1),
         "max_pitch_deg": round(max_pitch, 1),
         "policy_calls": counts["policy_calls"], "server_errors": counts["server_errors"],
-        "server_model": policy.server_model,
+        "server_model": policy.server_model, "lower_body": args["lower_body"],
     }
     r["reason"] = failure_reason(r)
     pipe.close()
@@ -234,6 +234,8 @@ def main():
                    help="Thời gian chạy mỗi episode (demo dài 7.5 s). Tăng (ví dụ 30) để model có thời gian thử lại")
     p.add_argument("--hz", type=float, default=cd.ACTION_HZ, help="Tần số action chunk của model (dataset: 25)")
     p.add_argument("--timeout-ms", type=int, default=10000)
+    p.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
+                   help="fixed: chân khoá cứng như lúc thu demo; balance: policy thăng bằng của NVIDIA điều khiển chân + eo")
     p.add_argument("--expect-embodiment", default="new_embodiment",
                    help="Dừng nếu server báo embodiment khác (mặc định: checkpoint fine-tune). '' để bỏ kiểm tra")
     p.add_argument("--workers", type=int, default=2,
@@ -247,7 +249,7 @@ def main():
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     shared = {"host": args.host, "port": args.port, "hz": args.hz, "timeout_ms": args.timeout_ms,
-              "expect_embodiment": args.expect_embodiment,
+              "expect_embodiment": args.expect_embodiment, "lower_body": args.lower_body,
               "seconds": args.seconds, "save_video": args.save_video, "out": str(out)}
     jobs = [(t, s, cfg, shared) for t, s, cfg in load_jobs(args)]
     results = []
