@@ -621,47 +621,116 @@ Nhóm thử GR00T N1.7 trên mô phỏng MuJoCo với Unitree G1, nhiệm vụ g
 
 \section{Tự sinh dữ liệu demo}
 
-Không có dataset công khai nào đúng bài toán, nên nhóm tự sinh dữ liệu trong mô phỏng theo định dạng LeRobot.
-
-\begin{itemize}
-\item Phiên bản đầu dùng quỹ đạo lập trình sẵn, lon lệch trong ô $4 \times 4$\,cm: 100 episode huấn luyện, 40 episode kiểm tra. Hạn chế: hành động gần như không phụ thuộc vị trí lon nên mô hình có thể học thuộc quỹ đạo thay vì học nhìn.
-\item Phiên bản hai dùng động học ngược giải theo từng episode: lon đặt ngẫu nhiên trong vùng $11 \times 16$\,cm, đứng hoặc nằm với hướng bất kỳ; có kiểm tra va chạm, tự chọn đường vòng khi bị chắn. Bộ lập kế hoạch thành công 36/36 với lon đứng, 78\% với lon nằm bên tay phải và 69\% bên tay trái. Chỉ giữ episode thành công và phát lại được. Bộ dữ liệu gồm 400 episode huấn luyện và 40 episode kiểm tra, ghi ở 25 khung mỗi giây, mỗi episode 233 khung tương đương 9,3\,s; tập kiểm tra dùng seed khác hẳn tập huấn luyện. Bản mới nhất còn cho hai lon đổi phía trong khoảng một nửa số episode để mô hình buộc phải nhìn màu lon thay vì học lối tắt theo phía tay, và giữ tay đứng yên 2,5\,s sau khi đặt lon để mô hình không lặp lại động tác gắp.
-\item Có công cụ kiểm tra định dạng, phát lại hành động qua mô phỏng, và vẽ phân bố vị trí lon để bảo đảm tập kiểm tra không trùng tập huấn luyện.
-\end{itemize}
-
-\section{Fine-tune trên Google Colab}
-
-Nhóm fine-tune từ checkpoint gốc trên GPU L4, batch 32, khai báo dưới tag \code{NEW\_EMBODIMENT}, hai lần: lần đầu 5000 bước trên dữ liệu phiên bản đầu, lần hai 10\,000 bước trên 400 episode của dữ liệu phiên bản hai. Mỗi lần đánh giá open-loop trên 40 episode huấn luyện và 40 episode kiểm tra, kết quả ở Bảng~\ref{tab:openloop}.
+Không có dataset công khai nào đúng bài toán, nên nhóm tự sinh dữ liệu trong mô phỏng theo định dạng LeRobot, ghi ở 25\,Hz. Dữ liệu qua ba phiên bản (Bảng~\ref{tab:datasets}); mỗi phiên bản sửa điểm yếu mà phiên bản trước để lộ ra khi chạy closed-loop. Phiên bản A và B là dữ liệu của hai checkpoint A và B ở mục~\ref{sec:finetune}.
 
 \begin{table}[htbp]
 \centering\small
-\caption{Sai số open-loop của hai lần fine-tune, đơn vị hành động chuẩn hoá. MAE 0,005 tương đương khoảng 0,3 độ.}
-\label{tab:openloop}
-\begin{tabular}{lllrr}
+\setlength{\tabcolsep}{4pt}
+\caption{Ba phiên bản dữ liệu demo. Số lon đứng, lon nằm và số episode đổi phía tính trên tập huấn luyện.}
+\label{tab:datasets}
+\begin{tabular}{L{1.2cm}L{6.2cm}cccc}
 \toprule
-\textbf{Dữ liệu} & \textbf{Tập} & \textbf{Nhóm} & \textbf{MSE TB} & \textbf{MAE TB}\\
+\textbf{Bản} & \textbf{Cách sinh} & \textbf{Train / test} & \textbf{Đứng / nằm} & \textbf{Đổi phía} & \textbf{Độ dài}\\
 \midrule
-Phiên bản đầu, 5000 bước & Huấn luyện & 40 episode & 0,000284 & 0,00509\\
- & Kiểm tra & 40 episode & 0,000294 & 0,00526\\
-\midrule
-Phiên bản hai, 10\,000 bước & Huấn luyện & 40 episode & 0,00395 & 0,0149\\
- & Kiểm tra & 40 episode & 0,00537 & 0,0189\\
- & Kiểm tra & lon đứng, 18 episode & 0,00392 & 0,0152\\
- & Kiểm tra & lon nằm, 22 episode & 0,00656 & 0,0219\\
+Pilot & Quỹ đạo lập trình sẵn, lon đứng, lệch trong ô $4 \times 4$\,cm & 100 / 40 & 100 / 0 & 0 & --\\
+A & Động học ngược theo từng episode, lon trong vùng $11 \times 16$\,cm, đứng hoặc nằm hướng bất kỳ & 400 / 40 & 219 / 181 & 0 & 7,5\,s\\
+B & Như A, thêm cảnh hai lon đổi phía; giữ yên 2,5\,s cuối episode & 400 / 40 & 175 / 225 & 200 & 9,3\,s\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Nhận định về lần đầu: chênh lệch giữa tập huấn luyện và kiểm tra khoảng 3\% và sai số đều giữa các episode, nhưng khi chạy closed-loop chỉ đạt 3/10 lần gắp thành công: tay khép đúng lúc nhưng cách lon hơn 5\,cm vì mô hình lệch có hệ thống khoảng 1\,cm so với demo, trong khi quỹ đạo lập trình sẵn chỉ cho biên dư 0,7\,cm. Sai số open-loop rất thấp vì mô hình học thuộc quỹ đạo, không phải vì biết nhìn lon.
+\begin{itemize}
+\item \textbf{Pilot.} Hành động gần như không phụ thuộc vị trí lon nên mô hình có thể học thuộc quỹ đạo thay vì học nhìn. Demo pilot chỉ chừa 0,7\,cm biên dư: mô phỏng chỉ cho kẹp khi điểm gắp trong lòng bàn tay cách tâm lon không quá 5\,cm, còn demo khép tay ở 4,3\,cm.
+\item \textbf{Phiên bản A} (\code{g1\_can\_sort\_ik}). Bộ lập kế hoạch giải động học ngược cho từng episode, có kiểm tra va chạm và tự chọn đường vòng. Lon đứng được gắp ngang; lon nằm được úp tay từ trên xuống, xoay 35 độ quanh trục lon để ngón cái không chạm bàn. Khi thu, bộ lập kế hoạch thành công 97--99\% với lon đứng và 73--76\% với lon nằm. Biên dư kẹp tăng lên 2,6 đến 4,5\,cm. Coca luôn nằm bên phải, Pepsi luôn bên trái, cùng phía với tay gắp và khay của nó.
+\item \textbf{Phiên bản B} (\code{g1\_can\_sort\_swap\_hold}). Ở dữ liệu A, mô hình có thể đi lối tắt ``lệnh Coca thì dùng tay phải, gắp lon bên phải'' mà không cần phân biệt màu. B cho cả hai lon đổi phía với xác suất 0,7; mỗi lon vẫn do tay cùng phía với khay của nó gắp, nên tay phải phải vươn chéo người, có xoay eo tới $\pm 0{,}6$\,rad. Kiểm tra va chạm tính cả lon đang cầm và chừa 1\,cm quanh lon còn lại. Gắp chéo khó: bộ lập kế hoạch chỉ thành công 22--25\% với lon đứng đổi phía (lỗi chính là cẳng tay va lon kia) và 64--76\% với lon nằm đổi phía, nên phần đổi phía của B lệch về lon nằm (52 đứng, 148 nằm).
+\item \textbf{Giữ yên cuối episode.} Demo A kết thúc 0,7\,s sau khi đặt lon; khi chạy lâu hơn, mô hình A gắp lon từ khay ra lại. B kéo dài đoạn đứng yên lên 2,5\,s.
+\item \textbf{Kiểm tra.} Chỉ giữ episode thành công và phát lại được: phát lại 400/400 episode train và 40/40 episode kiểm tra ở cả A và B. Có công cụ kiểm tra định dạng, vẽ phân bố vị trí lon để bảo đảm tập kiểm tra không trùng tập huấn luyện, và đo khoảng hở giữa cánh tay với lon còn lại trong từng demo.
+\end{itemize}
 
-Nhận định về lần hai: MAE cao gấp khoảng 3 đến 4 lần lần đầu là điều dự kiến, vì hành động giải bằng động học ngược phụ thuộc thật vào vị trí và hướng lon, hai con số không so sánh trực tiếp được. Checkpoint 10\,000 bước tốt hơn checkpoint 5000 bước rõ rệt, MAE giảm 30 đến 39\% trên cả hai tập. Chênh lệch giữa tập huấn luyện và kiểm tra khoảng 27\%, tập kiểm tra vẫn đang cải thiện nên chưa phải overfit có hại. Lon nằm vẫn là điểm yếu, sai số cao hơn lon đứng khoảng 1,4 lần. Việc đang làm: chạy closed-loop với checkpoint này trên tập kiểm tra bằng công cụ đánh giá đã viết để đo tỉ lệ gắp thành công theo vị trí lon, và fine-tune trên bản dữ liệu có lon đổi phía.
+\section{Fine-tune trên Google Colab}
+\label{sec:finetune}
+
+Cả ba checkpoint fine-tune từ checkpoint gốc \code{nvidia/GR00T-N1.7-3B} dưới tag \code{NEW\_EMBODIMENT}. Phần được huấn luyện gồm các tầng cuối của backbone (khoảng 0,2 tỉ tham số), DiT (khoảng 1,09 tỉ) và projector riêng của robot; bộ mã hoá ảnh và LLM đóng băng.
+
+\begin{itemize}
+\item \textbf{Pilot}: dữ liệu pilot, GPU L4, batch 32, 5\,000 bước.
+\item \textbf{A-10000}: dữ liệu A, GPU A100 80\,GB, batch 64, 10\,000 bước, khoảng 8,5 lần đi qua dữ liệu. Loss giảm từ 1,33 xuống 0,0041, không có spike.
+\item \textbf{B-9000}: dữ liệu B, cùng batch với A, lấy checkpoint ở bước 9\,000. Train từ checkpoint gốc, không từ A.
+\end{itemize}
+
+\subsection{Kết quả open-loop}
+
+\begin{table}[htbp]
+\centering\small
+\caption{Sai số open-loop trên 40 episode mỗi tập, đơn vị hành động chuẩn hoá. Mỗi checkpoint đo trên tập kiểm tra của dữ liệu của nó.}
+\label{tab:openloop}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Checkpoint} & \textbf{Tập kiểm tra} & \textbf{MAE train} & \textbf{MAE test} & \textbf{Chênh lệch}\\
+\midrule
+Pilot, 5\,000 bước & pilot & 0,0051 & 0,0053 & 3\%\\
+A, 5\,000 bước & A & 0,0244 & 0,0269 & 10\%\\
+A, 10\,000 bước & A & 0,0149 & 0,0189 & 27\%\\
+B, 5\,000 bước & B & 0,0149 & 0,0164 & 10\%\\
+B, 7\,000 bước & B & 0,0100 & 0,0118 & 18\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Bảng~\ref{tab:openloop} cho thấy:
+\begin{itemize}
+\item Sai số A cao gấp khoảng 5 lần pilot là dự kiến: hành động của A phụ thuộc thật vào vị trí và hướng lon, còn pilot gần như cố định. Con số giữa các tập không so trực tiếp được; B còn có khoảng 19\% khung đứng yên, vốn dễ đoán.
+\item Train dài hơn giúp rõ: A từ 5\,000 lên 10\,000 bước giảm MAE test 30\%, B từ 5\,000 lên 7\,000 bước giảm 28\%. Chênh lệch train--test tăng dần nhưng MAE test vẫn giảm, nên chưa phải overfit có hại.
+\item Lon nằm luôn khó hơn lon đứng: với A-10000, MAE test lon nằm gấp 1,44 lần lon đứng. Một phần là do dữ liệu có hai kiểu gắp lon nằm (tay tiếp cận từ bên cạnh hoặc úp từ trên xuống) cho những cảnh rất gần nhau; sai số open-loop của lon nằm vì vậy có một mức sàn mà train thêm không xoá được.
+\end{itemize}
+
+\subsection{Kết quả closed-loop}
+
+Closed-loop cho mô hình thật trên Colab điều khiển robot trong mô phỏng. Một episode thành công khi lon đúng nằm trong khay đúng, tay đã nhả, và lon còn lại bị xô lệch dưới 3\,cm. Mỗi episode chạy tối đa 20\,s và dừng ngay khi thành công; chân robot khoá cứng như lúc thu dữ liệu.
+
+Checkpoint pilot chỉ đạt 3/10 ngay ở vị trí lon mặc định. Mọi lần hỏng giống nhau: tay khép đúng lúc nhưng cách lon 5,2 đến 5,7\,cm, vượt ngưỡng kẹp vài mm. Mô hình lệch có hệ thống khoảng 1\,cm so với demo, trong khi demo pilot chỉ có 0,7\,cm biên dư; sai 0,02 rad ở cổ tay đã đủ thành 1\,cm ở điểm gắp. Kết quả của A và B trên cùng 40 cảnh mỗi tập ở Bảng~\ref{tab:closedloop}.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Số episode thành công closed-loop của A-10000 và B-9000. Tập A chỉ có cảnh cùng phía; tập B có 26/40 cảnh đổi phía.}
+\label{tab:closedloop}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Tập kiểm tra} & \textbf{Nhóm} & \textbf{Số ep} & \textbf{A-10000} & \textbf{B-9000}\\
+\midrule
+A & Tất cả & 40 & 30 (75\%) & 31 (78\%)\\
+ & Lon đứng & 18 & 17 & 18\\
+ & Lon nằm & 22 & 13 & 13\\
+\midrule
+B & Tất cả & 40 & 14 (35\%) & 23 (58\%)\\
+ & Cùng phía, lon đứng & 8 & 8 & 8\\
+ & Cùng phía, lon nằm & 6 & 6 & 5\\
+ & Đổi phía, lon đứng & 4 & 0 & 0\\
+ & Đổi phía, lon nằm & 22 & 0 & 10\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Nhận định:
+\begin{itemize}
+\item \textbf{A đi lối tắt đúng như dự đoán.} Ở cảnh đổi phía A đạt 0/26: tay đi về lon nằm bên phía mình, 20 ca xô lon còn lại, trung bình khép tay 6,8 lần mỗi episode. Ở cảnh cùng phía A đạt 14/14.
+\item \textbf{B học được nhìn màu lon}: 10/22 ca lon nằm đổi phía, và không kém A ở cảnh cùng phía (31 so với 30 trên tập A), dù B chỉ có 200 episode cùng phía, bằng một nửa A. Hai checkpoint hỏng ở các episode khác nhau (cả hai thành công 26, chỉ A 4, chỉ B 5), nên trên 40 episode chưa phân biệt được A với B ở cảnh cùng phía.
+\item \textbf{Lon đứng đổi phía hỏng hoàn toàn} ở cả A và B (0/4). Trong demo nhóm này, cánh tay đi cách lon kia trung vị dưới 1\,cm trước khi kẹp; mô hình lệch 1\,cm là đủ va.
+\item \textbf{Lon nằm là điểm yếu chung} (13/22 ở cả hai). Hai nguyên nhân: (1) mô hình khép tay thiếu tầm 1 đến 3\,cm theo hướng tiến vào lon và lệch ra ngoài 0,4 đến 1,8\,cm, lệch có hướng cố định chứ không phải nhiễu (đo trên A, lớn nhất ở Coca nằm với 3,1\,cm); (2) ở vùng hướng lon mà dữ liệu đổi kiểu gắp, mô hình đổi ý giữa hai chunk, chuyển từ tiếp cận ngang sang úp từ trên xuống, đụng lon làm rơi khỏi bàn. Mỗi lần gọi mô hình (0,3\,s) lấy nhiễu mới nên chunk kế tiếp có thể rơi vào kiểu kia. Giãn khoảng gọi lên 0,6\,s không giúp: 7/10 so với 9/10 trên cùng 10 episode.
+\item \textbf{Mô hình không biết khi nào xong.} Với A, 2/27 ca đặt xong rồi gắp lon ra lại. B giữ yên 2,5\,s nên sửa được các ca này, nhưng nếu cứ chạy tiếp 20\,s thì 3/4 ca hỏng trong 8 episode thử xảy ra sau khi đã xong. Vì vậy đánh giá dừng ngay khi thành công.
+\item \textbf{Dữ liệu gắn với bộ điều khiển chân.} Bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, B-9000 giảm từ 31/40 xuống 18/40 trên tập A. Phát lại nguyên hành động của demo, không dùng mô hình, cũng chỉ còn 8/14 cảnh cùng phía và 9/26 cảnh đổi phía (khoá cứng: 14/14 và 26/26). Khi chân khoá, thân robot vẫn ngả và hông trôi trung bình 5 đến 7\,cm, tối đa 13\,cm lúc vươn tay; bộ lập kế hoạch đã bù chuyển động này nên góc khớp trong demo chỉ đúng với chế độ khoá cứng.
+\end{itemize}
 
 \section{Bài học rút ra}
 
 \begin{itemize}
-\item Quy trình fine-tune của Isaac-GR00T chạy được trên Colab với GPU L4, khoảng vài giờ cho 5000 bước; không cần cụm GPU lớn cho bài toán nhỏ.
+\item Quy trình fine-tune của Isaac-GR00T chạy được trên Colab: GPU L4 đủ cho 5\,000 bước batch 32; muốn batch 64 và 10\,000 bước thì cần A100 80\,GB. Không cần cụm GPU lớn cho bài toán nhỏ.
+\item Sai số open-loop thấp không nói lên tỉ lệ thành công. Pilot có MAE 0,005, khoảng 0,3 độ, nhưng closed-loop chỉ 3/10. Phải đo closed-loop trên tập cảnh cố định, tách theo nhóm cảnh.
+\item Dữ liệu phải chặn được lối tắt. A không cần nhìn màu lon vì vị trí đã đủ để đoán, và hỏng 26/26 cảnh đổi phía; thêm cảnh đổi phía vào B là đủ để mô hình bắt đầu phân biệt hai lon.
+\item Demo phải chừa biên dư lớn hơn sai số của mô hình, khoảng 1 đến 3\,cm: biên dư kẹp, khoảng hở với lon còn lại. Demo đi sát lon kia dưới 1\,cm thì mô hình học theo sẽ va.
+\item Demo phải nhất quán: cùng một cảnh thì cùng một kiểu gắp. Hai kiểu gắp cho những cảnh gần nhau làm mô hình lưỡng lự giữa các chunk.
+\item Dữ liệu gắn với bộ điều khiển tầng dưới lúc thu. Muốn đổi sang chế độ chân tự giữ thăng bằng phải thu lại demo và train lại.
 \item Phần tốn công nhất không phải huấn luyện mà là khớp dữ liệu với mô hình: thứ tự khớp, hệ toạ độ, thống kê chuẩn hoá, góc camera. Sai một chỗ là mô hình vô dụng mà không báo lỗi.
-\item Dữ liệu demo phải đa dạng vị trí và hướng vật thể; dữ liệu chạy mù cho sai số thấp nhưng không dạy được mô hình nhìn.
 \item Muốn dùng whole-body control thật sự phải giải quyết nhãn motion token; đây là điểm nghẽn để chuyển từ chế độ bám góc khớp sang SONIC đầy đủ.
 \end{itemize}
 
