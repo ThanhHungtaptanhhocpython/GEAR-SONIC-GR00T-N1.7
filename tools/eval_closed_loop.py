@@ -72,7 +72,8 @@ def run_episode(job) -> dict:
     from PIL import Image
 
     pipe_kwargs = {"policy_mode": "remote", "server_host": args["host"], "server_port": args["port"],
-                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": args["lower_body"]}
+                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": args["lower_body"],
+                   "policy_replan_interval": args["replan_steps"]}
     pipe, ctx = cd.setup_episode(task, seed, cfg, pipeline_kwargs=pipe_kwargs)
     sim, policy = pipe.sim, pipe.policy
     if policy.mode != "remote":
@@ -132,6 +133,8 @@ def run_episode(job) -> dict:
         max_pitch = max(max_pitch, abs(pelvis_pitch_deg(sim.data.qpos)))
         if t_success is None and step % 25 == 0 and cd.is_success(pipe, ctx):
             t_success = step / CONTROL_HZ
+            if args["stop_on_success"]:
+                break
         if args["save_video"] != "none" and step % cd.CONTROL_STEPS_PER_FRAME == 0:
             img = Image.fromarray(sim.render_camera("front_camera")).resize(cd.IMAGE_SIZE, Image.BOX)
             frames.append(np.asarray(img))
@@ -150,7 +153,8 @@ def run_episode(job) -> dict:
         "other_moved_cm": round(float(np.linalg.norm(d.qpos[other_adr:other_adr + 3] - ctx["other_start"])) * 100, 1),
         "max_pitch_deg": round(max_pitch, 1),
         "policy_calls": counts["policy_calls"], "server_errors": counts["server_errors"],
-        "server_model": policy.server_model, "lower_body": args["lower_body"],
+        "server_model": policy.server_model, "lower_body": args["lower_body"], "replan_steps": args["replan_steps"],
+        "stop_on_success": args["stop_on_success"],
     }
     r["reason"] = failure_reason(r)
     pipe.close()
@@ -234,6 +238,12 @@ def main():
                    help="Thời gian chạy mỗi episode (demo dài 7.5 s). Tăng (ví dụ 30) để model có thời gian thử lại")
     p.add_argument("--hz", type=float, default=cd.ACTION_HZ, help="Tần số action chunk của model (dataset: 25)")
     p.add_argument("--timeout-ms", type=int, default=10000)
+    p.add_argument("--stop-on-success", action="store_true",
+                   help="Kết thúc episode ngay khi đặt xong (như --stop-on-success của launch_vla_simulation.py). Dùng khi "
+                        "tăng --seconds để đo thử lại: không tính lỗi gắp lại lon sau khi đã xong, và chạy nhanh hơn")
+    p.add_argument("--replan-steps", type=int, default=15,
+                   help="Số bước 50 Hz chạy theo một action chunk trước khi gọi model lần sau (15 = 0.3 s). Tăng (ví dụ "
+                        "30) để model ít đổi ý giữa các chunk, như lúc tay lưỡng lự giữa hai kiểu gắp lon nằm")
     p.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
                    help="fixed: chân khoá cứng như lúc thu demo; balance: policy thăng bằng của NVIDIA điều khiển chân + eo")
     p.add_argument("--expect-embodiment", default="new_embodiment",
@@ -249,7 +259,8 @@ def main():
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     shared = {"host": args.host, "port": args.port, "hz": args.hz, "timeout_ms": args.timeout_ms,
-              "expect_embodiment": args.expect_embodiment, "lower_body": args.lower_body,
+              "expect_embodiment": args.expect_embodiment, "lower_body": args.lower_body, "replan_steps": args.replan_steps,
+              "stop_on_success": args.stop_on_success,
               "seconds": args.seconds, "save_video": args.save_video, "out": str(out)}
     jobs = [(t, s, cfg, shared) for t, s, cfg in load_jobs(args)]
     results = []

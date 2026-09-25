@@ -207,6 +207,12 @@ def main():
         help="Thời gian chờ tối đa một lần truy vấn PolicyServer (ms). Tăng lên nếu GPU Colab chậm (ví dụ T4).",
     )
     parser.add_argument(
+        "--replan-steps",
+        type=int,
+        default=15,
+        help="Số bước 50 Hz chạy theo một action chunk trước khi gọi model lần sau (15 = 0.3 s).",
+    )
+    parser.add_argument(
         "--vla-action-hz",
         type=float,
         default=DEFAULT_ACTION_HZ,
@@ -296,6 +302,7 @@ def main():
         server_port=args.server_port,
         wbc_mode=args.wbc_mode,
         vla_action_hz=args.vla_action_hz,
+        policy_replan_interval=args.replan_steps,
         server_timeout_ms=args.server_timeout_ms,
         record_vla_path=args.record_vla,
         lower_body=args.lower_body,

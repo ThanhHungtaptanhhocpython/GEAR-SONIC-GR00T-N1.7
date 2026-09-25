@@ -704,6 +704,74 @@ Lệnh như `g1_can_sort_swap` (`--episodes-per-task 200 --swap-prob 0.7`, cùng
   thấp hơn khoảng 2 cm và còn dịch vài cm khi vươn tay, nên ảnh camera khác một chút. Cần chạy
   `eval_closed_loop --lower-body balance` và so với `fixed` trên cùng tập test.
 
+### 5.2g. Closed-loop B-9000 trên `ik_test`: lon Coca nằm hỏng nhiều hơn (25/09, `eval/B9000_ik_test`, đang chạy)
+14/40 episode đầu: 12 thành công. Lon Coca nằm 4/6, Coca đứng 1/1, Pepsi đứng 5/5, Pepsi nằm 2/2. A-10000 trên 27 episode:
+Coca nằm 6/10, Pepsi nằm 5/6. Mẫu còn nhỏ, nhưng Coca nằm là nhóm yếu nhất ở cả A lẫn B.
+- B sửa được các ca của A: 100008 (A hụt 6.3 cm, B kẹp ở 1.8 cm), 100051 và 100053 (A đặt xong rồi gắp lại; `hold` 2.5 s có tác dụng).
+- B hỏng đúng hai cảnh A cũng hỏng: 100002 và 100009, đều là Coca nằm, yaw gập theo 180° là **103° và 100°**. Kiểu hỏng
+  nặng hơn A: khép tay cách lon 14.4 / 9.5 cm, lon rơi khỏi bàn (A: hụt 7 cm, lon vẫn trên bàn).
+- **Video:** tay tiếp cận thấp từ bên cạnh, rồi giữa chừng (1.4 s ở 100002, 3.2 s ở 100009) chuyển sang giơ cao và hạ từ trên
+  xuống. Đó là hai kiểu gắp lon nằm ở mục 5.0e. Tay đổi ý giữa các chunk, đụng lon làm lon rơi, rồi vẫn làm động tác đặt với
+  tay rỗng.
+- **Dữ liệu:** với Coca nằm cùng phía (tay phải), kiểu gắp đổi theo yaw ngay quanh 90–100°.
+
+  | Yaw gập | 0–20 | 20–40 | 40–60 | 60–80 | 80–100 | 100–120 | 120–140 | 140–160 | 160–180 |
+  |---|---|---|---|---|---|---|---|---|---|
+  | A (`g1_can_sort_ik`) kiểu +/tổng | 4/7 | 2/4 | 6/7 | 15/15 | 13/13 | 5/7 | 0/13 | 1/10 | 1/16 |
+  | B (`swap_hold`) kiểu +/tổng | 2/6 | 4/7 | 3/3 | 4/4 | **0/0** | 0/3 | 0/4 | 0/6 | 0/6 |
+
+  - B chỉ có 39 episode Coca nằm cùng phía (A có 92), vì 70% episode là đổi phía. B không có episode nào ở 80–100°, và các
+    láng giềng gần nhất của 100002/100009 lẫn cả hai kiểu (`---++-`, `--+--+`).
+  - Cảnh thử rơi đúng vào chỗ đổi kiểu và cũng là chỗ thiếu dữ liệu. Flow matching lấy noise mới ở mỗi lần gọi model (mỗi
+    0.3 s), nên các chunk liên tiếp có thể rơi vào hai kiểu khác nhau.
+- **100014** (Coca nằm, yaw gập 121°, cũng gần ranh giới, B chỉ có 7 episode ở 100–140°): hỏng vì lần gắp đầu, không phải vì
+  video ngắn.
+  - 0.5–2.9 s: tay lượn quanh lon, lưỡng lự.
+  - Khoảng 3.7 s: khép tay cách lon 11.7 cm, đẩy lon 17 cm tới (0.513, 0.008), ra ngoài vùng train (x 0.26–0.37).
+  - 4.5–5.3 s: đặt tay rỗng vào khay rồi về ready.
+  - Từ 6.9 s: vươn lại về phía lon, tới 10 s thì hết giờ.
+  - Chạy dài hơn (`--seconds 20`) có thể cho thêm `ok_any`, nhưng lần thử lại bắt đầu từ vị trí lon ngoài phân bố. Nên báo
+    riêng "thành công lần đầu" và "thành công sau khi thử lại" (mục 5.2c).
+- **Kết quả 28/40 (dừng giữa chừng, chạy tiếp bằng `--resume`): 20/28 = 71%** (khoảng tin cậy 95%: 53–85%).
+  - Coca 8/14 (57%), Pepsi 12/14 (86%). Pepsi đứng 7/7, Coca đứng 2/4.
+  - Lý do hỏng: 4 lon rơi khỏi bàn, 4 khép tay hụt (5–14 cm).
+  - So cặp với A-10000 trên 27 episode chung: A 19/27, B 20/27. Nhưng hai checkpoint hỏng ở các episode khác nhau: 5 episode
+    chỉ A thành công (100012, 100014, 100017, 100018, 100057), 6 episode chỉ B thành công (100008, 100010, 100015, 100049,
+    100051, 100053). McNemar p = 1.0, tức chưa phân biệt được A với B trên các ca cùng phía.
+  - Kết quả mỗi episode khó thường như tung đồng xu, nên cần nhiều episode hoặc chạy lặp.
+  - B giữ được mức của A ở ca cùng phía (đúng tiêu chí ở mục 7), dù chỉ có khoảng 40% dữ liệu cùng phía so với A. Ưu thế của
+    B phải đo trên tập đổi phía (`g1_can_sort_swap_hold_test`).
+- **Chạy 20 s (`eval/B9000_ik_test_20s`, 8 episode đầu): `ok` 4/8, `ok_any` 7/8.** Chạy 10 s trên cùng 8 episode: 7/8.
+  - **100046** (Pepsi đứng): xong lúc 5.5 s. Tới 7.7 s model gắp lon ra khỏi khay rồi đặt nằm trên bàn, sau đó đẩy lon ra
+    mép. Khoảng 16 s tay phải còn đi tìm lon Coca. Kết thúc với 3 lần khép tay, lon Pepsi rơi khỏi bàn.
+  - **100004** (Coca nằm): xong lúc 7.0 s. Khoảng 9–11 s tay thò vào khay định gắp lại, sau đó lon Pepsi bị xô 17.9 cm.
+  - **100002** (Coca nằm): lần này xong lúc 6.0 s (ở lượt 10 s thì hỏng), robot đứng yên, nhưng lon còn lại lệch 3.2 cm, vượt
+    ngưỡng 3 cm của `is_success`. Thực chất là thành công, trượt ngưỡng 2 mm.
+  - **100049** (Pepsi nằm, sát lon Coca): lần đầu cánh tay trái quét đổ lon Coca, cả hai lon rơi khỏi bàn trước 7.6 s. 12 s
+    còn lại robot khua tay trên bàn trống, không thể thử lại.
+  - Kết luận:
+    - Trong 8 episode này, thời gian thêm không cứu được ca nào nhờ thử lại.
+    - 3/4 ca hỏng xảy ra **sau khi đã xong**. Model không biết việc đã xong khi đứng quá 2.5 s `hold` ở tư thế ready, nên bắt
+      đầu lại task, đúng như dự đoán ở mục 5.2d.
+    - Muốn đo thử lại phải kết thúc episode khi thành công.
+  - **Công cụ:** thêm `eval_closed_loop.py --stop-on-success`, kết thúc episode ngay khi `is_success` đúng lần đầu, và ghi
+    `stop_on_success` vào kết quả. Lượt 20 s nên chạy với cờ này.
+  - Muốn model tự dừng thì cần thêm dữ liệu "đã xong" (lon nằm sẵn trong khay, action đứng yên) như đề xuất ở mục 5.2d. Khi
+    triển khai thì dùng bộ phát hiện xong như `--stop-on-success` của GUI.
+- **Việc làm được ngay, không cần train lại:** thêm cờ `--replan-steps` (mặc định 15 = 0.3 s) cho `eval_closed_loop.py` và
+  `launch_vla_simulation.py`, và ghi `replan_steps` vào `results.jsonl`. Chunk dài 40 khung ở 25 Hz, tức 1.6 s = 80 bước 50 Hz.
+  Thử 30 (0.6 s) để giảm số lần đổi ý; đổi lại, model sửa sai chậm hơn.
+- **Thử `--replan-steps 30` (`eval/B9000_ik_test_replan30`, 10 episode đầu): 7/10**, trong khi bản 15 bước đạt 9/10 trên
+  cùng 10 episode. Không giúp được gì.
+  - 100002 hụt gần hơn (5.6 cm so với 14.4 cm), nhưng vẫn không kẹp được.
+  - 100004 (Coca nằm, yaw 98°): vẫn đổi kiểu gắp lúc 2.4 s, từ tiếp cận ngang sang hạ từ trên xuống. Lon bị đẩy lăn rồi rơi.
+  - 100049 (Pepsi nằm, sát lon Coca): cánh tay quét đổ lon Coca lúc 1.9–2.4 s. Chunk sai phải chạy tới 0.6 s mới được sửa.
+  - Lý do: giãn khoảng gọi chỉ giảm số lần lấy noise mới (17 lần thay vì 34), mỗi lần vẫn có thể rơi vào kiểu kia; mà sửa
+    sai lại chậm hơn. Giữ mặc định 15.
+- **Tuỳ chọn khác:**
+  - Server cố định seed noise, để hai lần gọi liên tiếp với quan sát gần nhau cho ra cùng một kiểu gắp.
+  - Sửa planner cho kiểu gắp lon nằm nhất quán theo yaw, và phủ dày dữ liệu cùng phía quanh ranh giới đổi kiểu.
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel
