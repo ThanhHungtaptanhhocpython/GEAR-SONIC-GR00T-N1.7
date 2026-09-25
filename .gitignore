@@ -23,3 +23,5 @@ report/*.fls
 report/*.synctex.gz
 report/*.docx
 report/*.pdf
+eval/
+third_party/

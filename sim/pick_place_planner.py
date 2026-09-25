@@ -61,7 +61,7 @@ STEPS = {
     "retreat": 30,   # rút tay ra và lên cao
     "return": 35,    # về điểm cao ngay phía trên tư thế ready
     "settle": 20,    # hạ thẳng xuống tư thế ready
-    "hold": 35,      # đứng yên để model học dừng lại
+    "hold": 35,      # đứng yên để model học dừng lại (mặc định; collect_demos.py --hold-seconds đổi qua hold_steps)
 }
 TOTAL_STEPS = sum(STEPS.values())
 
@@ -146,9 +146,11 @@ class PickPlacePlanner:
     """Lập quỹ đạo gắp lon `can` ('coke' tay phải, 'pepsi' tay trái, lon có thể ở bất kỳ nửa bàn nào) đặt vào khay
     cùng màu."""
 
-    def __init__(self, sim, can: str, waist_yaw: Optional[bool] = None):
-        """waist_yaw: cho IK dùng waist_yaw; mặc định (None) chỉ bật khi lon đang ở nửa bàn bên kia (gắp chéo người)."""
+    def __init__(self, sim, can: str, waist_yaw: Optional[bool] = None, hold_steps: Optional[int] = None):
+        """waist_yaw: cho IK dùng waist_yaw; mặc định (None) chỉ bật khi lon đang ở nửa bàn bên kia (gắp chéo người).
+        hold_steps: số bước 50 Hz đứng yên ở tư thế ready cuối episode (mặc định STEPS["hold"])."""
         m = sim.model
+        self.hold_steps = STEPS["hold"] if hold_steps is None else int(hold_steps)
         self.sim = sim
         self.can = can
         self.grasp = sim.grasps[can]
@@ -407,6 +409,32 @@ class PickPlacePlanner:
             return path
         raise error
 
+    def _return_path(self, qpos, q_from) -> List[np.ndarray]:
+        """Từ q_from (tay đã rút lên khỏi khay) về điểm cao phía trên tư thế ready rồi hạ thẳng xuống.
+
+        Chỉ kiểm tra va chạm với thân robot: lúc này robot còn ngả về trước vì tay đang giơ xa (tới ~8°), nên tính với
+        pose pelvis hiện tại sẽ thấy bàn tay thấp và xa hơn thực tế, trúng cả lon trong khay."""
+        qpos_upright = qpos.copy()
+        qpos_upright[:7] = self.sim.model.qpos0[:7]
+        p_ready, rot_ready = self.ik.forward(qpos_upright, self.q_ready)
+        r = self.ik.solve(qpos_upright, rotation_target(p_ready + READY_RISE * UP, rot_ready), q_init=self.q_ready,
+                          q_nominal=self.q_ready)
+        q_high = r.q if r.pos_err < FREE_PATH_POS_TOL else self.q_ready
+        path = self._free_path(qpos, q_from, q_high, STEPS["return"], self.ik.robot_mask, what="về tư thế ready")
+        return path + [(1.0 - w) * q_high + w * self.q_ready for w in smoothstep(STEPS["settle"])]
+
+    def return_to_ready(self, ctrl_now: np.ndarray) -> List[np.ndarray]:
+        """Mục tiêu actuator 50 Hz đưa tay từ mục tiêu điều khiển hiện tại `ctrl_now` (đã nhả lon) nhấc thẳng lên
+        RETREAT_RISE rồi về tư thế ready như cuối targets(). Dùng khi ngừng gọi model sau khi đặt xong lon
+        (launch_vla_simulation.py --stop-on-success). Raises PlanningError nếu IK/va chạm không cho phép."""
+        qpos = self.sim.data.qpos.copy()
+        q_now = np.asarray(ctrl_now, dtype=np.float64)[self.ctrl_idx]
+        p0, rot_now = self.ik.forward(qpos, q_now)
+        path = self._pose_path(qpos, q_now, p0 + RETREAT_RISE * UP, rot_now, STEPS["retreat"], self.carry_obstacles,
+                               tol=FREE_PATH_POS_TOL, what="nhấc tay khỏi khay")
+        path += self._return_path(qpos, path[-1])
+        return [self._ctrl(q, 0.0) for q in path]
+
     def _servo(self, qpos_plan, path, grip, obstacles, point=None) -> Iterator[np.ndarray]:
         """Chạy lại đường đã lập nhưng bám pose trong khung world: mỗi bước giải lại IK với pose pelvis đo được lúc
         đó. Khi robot ngả người (eo cúi, tay vươn xa) pelvis dịch vài cm, nên cùng góc khớp thì bàn tay lệch khỏi lon;
@@ -536,19 +564,7 @@ class PickPlacePlanner:
                                tol=FREE_PATH_POS_TOL, what="rút tay")
         for q in path:
             yield self._ctrl(q, 0.0)
-        # Về điểm cao phía trên tư thế ready rồi hạ thẳng xuống. Chỉ kiểm tra va chạm với thân robot: lúc này robot
-        # còn ngả về trước vì tay đang giơ xa (tới ~8°), nên tính với pose pelvis hiện tại sẽ thấy bàn tay thấp và
-        # xa hơn thực tế, trúng cả lon trong khay
-        qpos = d.qpos.copy()
-        qpos_upright = qpos.copy()
-        qpos_upright[:7] = self.sim.model.qpos0[:7]
-        p_ready, rot_ready = self.ik.forward(qpos_upright, self.q_ready)
-        r = self.ik.solve(qpos_upright, rotation_target(p_ready + READY_RISE * UP, rot_ready), q_init=self.q_ready,
-                          q_nominal=self.q_ready)
-        q_high = r.q if r.pos_err < FREE_PATH_POS_TOL else self.q_ready
-        path = self._free_path(qpos, path[-1], q_high, STEPS["return"], self.ik.robot_mask, what="về tư thế ready")
-        path += [(1.0 - w) * q_high + w * self.q_ready for w in smoothstep(STEPS["settle"])]
-        for q in path:
+        for q in self._return_path(d.qpos.copy(), path[-1]):
             yield self._ctrl(q, 0.0)
-        for _ in range(STEPS["hold"]):
+        for _ in range(self.hold_steps):
             yield self._ctrl(self.q_ready, 0.0)

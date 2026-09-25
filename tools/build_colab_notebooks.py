@@ -124,7 +124,7 @@ Notebook chạy model **GR00T N1.7 thật** trên GPU Colab và nối với mô 
 2. Chạy lần lượt từ Bước 1 đến Bước 6. Cell `%%writefile` (Bước 4) ghi file server. Ở Bước 5 chọn checkpoint; server **chạy nền**.
 3. Copy lệnh in ra ở Bước 6 sang terminal máy local.
 4. Tunnel Pinggy miễn phí hết hạn sau khoảng 60 phút: chạy lại Bước 6 để lấy host/port mới, không cần nạp lại model.
-   Bước 7 xem trạng thái và log server; Bước 8 dừng server.
+   Bước 7 xem trạng thái và log server; Bước 8 dừng server (phải đặt `STOP_SERVER = True`).
 
 Với checkpoint base, model chưa từng thấy cảnh sim này nên robot sẽ cử động nhưng gần như chắc chắn không gắp được lon.
 
@@ -137,19 +137,22 @@ Isaac-GR00T được ghim ở commit `{ISAAC_COMMIT[:7]}`.
         code(r"""
 # [BƯỚC 5] Khởi chạy PolicyServer chạy nền (port 5550), log ghi ra /content/server.log.
 # Cell chờ tới khi server sẵn sàng. Bấm ■ chỉ dừng việc chờ, server vẫn chạy; xem trạng thái ở Bước 7, dừng ở Bước 8.
-# Checkpoint base: lần đầu tải GR00T-N1.7-3B (~7 GB) và backbone Cosmos-Reason2-2B.
-# Checkpoint fine-tune: đường dẫn checkpoint-<bước> trên Drive (Bước 10 của colab_gr00t_finetune.ipynb)
-#   MODEL_PATH = "/content/drive/MyDrive/gr00t/checkpoints/g1_can_sort_ik/checkpoint-10000"
-#   (thư mục con = DATASET_NAME lúc fine-tune; checkpoint pilot cũ: .../g1_can_sort_pilot/checkpoint-5000)
-#   EMBODIMENT_TAG = "new_embodiment"
+# Checkpoint fine-tune: đường dẫn checkpoint-<bước> trên Drive (Bước 10 của colab_gr00t_finetune.ipynb),
+#   thư mục con = DATASET_NAME lúc fine-tune (checkpoint pilot cũ: .../g1_can_sort_pilot/checkpoint-5000).
+# Checkpoint base (chỉ để thử, không gắp được lon): lần đầu tải GR00T-N1.7-3B (~7 GB) và backbone Cosmos-Reason2-2B
+#   MODEL_PATH = "nvidia/GR00T-N1.7-3B"
+#   EMBODIMENT_TAG = "real_g1_relative_eef_relative_joints"
+#   (tools/eval_closed_loop.py mặc định dừng nếu server không chạy checkpoint new_embodiment)
 # Checkpoint trên Drive được chép về /content/ckpt trước: nạp thẳng từ Drive rất chậm (~13 phút cho 3 shard),
 # nạp từ đĩa local nhanh hơn nhiều. Lần chạy sau trên cùng runtime bỏ qua các file đã chép đủ.
+# Lần chép đầu vẫn bị giới hạn bởi tốc độ Drive (~15 MB/s, có thể vài phút mỗi shard); tiến độ in mỗi 30 s.
+# Nếu Drive rớt (Errno 107) thì tự mount lại và chép tiếp từ chỗ dừng; chạy lại cell cũng chép tiếp từ file .part.
 # POLICY = "scripted" để phục vụ quỹ đạo mẫu thay cho model.
-MODEL_PATH = "nvidia/GR00T-N1.7-3B"
-EMBODIMENT_TAG = "real_g1_relative_eef_relative_joints"
+MODEL_PATH = "/content/drive/MyDrive/gr00t/checkpoints/g1_can_sort_ik/checkpoint-10000"
+EMBODIMENT_TAG = "new_embodiment"
 POLICY = "gr00t"
 
-import os, re, shutil, socket, subprocess, time
+import os, re, socket, subprocess, time
 """ + VENV_CHECK + r"""
 
 
@@ -162,24 +165,58 @@ def port_open(port=5550):
 assert not port_open(), "Port 5550 đang có server chạy. Dừng bằng Bước 8 rồi chạy lại cell này."
 
 if MODEL_PATH.startswith("/content/drive"):
+    import errno
     from google.colab import drive
     drive.mount("/content/drive")
     assert os.path.isdir(MODEL_PATH), f"Không thấy checkpoint {MODEL_PATH}"
     local = "/content/ckpt/" + "_".join(MODEL_PATH.rstrip("/").split("/")[-2:])
-    for root, _, files in os.walk(MODEL_PATH):
-        for name in sorted(files):
-            src = os.path.join(root, name)
-            dst = os.path.join(local, os.path.relpath(src, MODEL_PATH))
-            size = os.path.getsize(src)
-            if os.path.exists(dst) and os.path.getsize(dst) == size:
-                continue
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            t0 = time.time()
-            shutil.copyfile(src, dst + ".part")
-            os.replace(dst + ".part", dst)
-            if size > 100e6:
-                dt = time.time() - t0
-                print(f"  chép {os.path.relpath(src, MODEL_PATH)}: {size / 1e9:.2f} GB, {dt:.0f} s ({size / 1e6 / max(dt, 1e-3):.0f} MB/s)")
+    jobs = [(os.path.join(root, name), os.path.getsize(os.path.join(root, name)))
+            for root, _, files in os.walk(MODEL_PATH) for name in sorted(files)]
+    total = sum(size for _, size in jobs)
+    print(f"Checkpoint trên Drive: {len(jobs)} file, {total / 1e9:.2f} GB")
+
+    def copy_resumable(src, dst, size, chunk=64 << 20):
+        # Chép theo khối và nối tiếp vào .part nếu lần trước bị ngắt; in tiến độ mỗi 30 s
+        part = dst + ".part"
+        done = os.path.getsize(part) if os.path.exists(part) else 0
+        t0, t_print, start = time.time(), time.time(), done
+        with open(src, "rb") as fi, open(part, "ab") as fo:
+            fi.seek(done)
+            while done < size:
+                buf = fi.read(chunk)
+                if not buf:
+                    raise OSError(errno.EIO, f"Đọc thiếu {src}: {done}/{size} byte")
+                fo.write(buf)
+                done += len(buf)
+                if time.time() - t_print > 30:
+                    rate = (done - start) / 1e6 / (time.time() - t0)
+                    print(f"    {os.path.basename(src)}: {done / 1e9:.2f}/{size / 1e9:.2f} GB, {rate:.0f} MB/s, "
+                          f"còn khoảng {(size - done) / 1e6 / max(rate, 1e-3) / 60:.1f} phút")
+                    t_print = time.time()
+        os.replace(part, dst)
+        return (done - start) / 1e6 / max(time.time() - t0, 1e-3)
+
+    for src, size in jobs:
+        dst = os.path.join(local, os.path.relpath(src, MODEL_PATH))
+        if os.path.exists(dst) and os.path.getsize(dst) == size:
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if size > 100e6:
+            print(f"  chép {os.path.relpath(src, MODEL_PATH)} ({size / 1e9:.2f} GB)...")
+        for attempt in range(1, 6):
+            try:
+                rate = copy_resumable(src, dst, size)
+                break
+            except OSError as e:
+                # Errno 107 (Transport endpoint is not connected): FUSE của Drive bị rớt khi đọc file lớn.
+                # Mount lại rồi chép tiếp từ chỗ dừng.
+                if e.errno not in (errno.ENOTCONN, errno.EIO) or attempt == 5:
+                    raise
+                print(f"  ⚠️ {e}; mount lại Drive và chép tiếp (lần {attempt + 1}/5)")
+                time.sleep(5)
+                drive.mount("/content/drive", force_remount=True)
+        if size > 100e6:
+            print(f"  xong {os.path.relpath(src, MODEL_PATH)}, {rate:.0f} MB/s")
     print(f"Checkpoint local: {local}")
     MODEL_PATH = local
 
@@ -189,6 +226,7 @@ server_proc = subprocess.Popen(
      "--policy", POLICY, "--model-path", MODEL_PATH, "--embodiment-tag", EMBODIMENT_TAG],
     cwd="/content/Isaac-GR00T", stdout=open(SERVER_LOG, "w"), stderr=subprocess.STDOUT,
     env={**os.environ, "PYTHONUNBUFFERED": "1"}, start_new_session=True)
+print(f"Model: {MODEL_PATH} | embodiment {EMBODIMENT_TAG} | policy {POLICY}")
 print(f"Đã khởi động server (PID {server_proc.pid}). Log: {SERVER_LOG}. Đang chờ server sẵn sàng...")
 
 t0, last = time.time(), ""
@@ -258,6 +296,9 @@ with socket.socket() as s:
     s.settimeout(1)
     listening = s.connect_ex(("127.0.0.1", 5550)) == 0
 print("Server:", "đang lắng nghe ở port 5550" if listening else "KHÔNG chạy")
+loaded = re.search(r"Đang nạp GR00T từ (.*?) \(embodiment (\S+)\)", log)
+if loaded:
+    print(f"Model: {loaded.group(1)} | embodiment {loaded.group(2)}")
 reqs = re.findall(r"^\[(\d+)\] .*suy luận (\d+) ms", log, re.M)
 if reqs:
     ms = [int(m) for _, m in reqs[-50:]]
@@ -268,11 +309,17 @@ print("\n".join(re.split(r"[\r\n]+", log.strip())[-15:]))
 """),
         code(r"""
 # [BƯỚC 8] Dừng server (ví dụ để đổi checkpoint ở Bước 5). Tunnel giữ nguyên.
+# Phải đổi STOP_SERVER = True mới dừng, để "Chạy tất cả" không tắt server vừa khởi động ở Bước 5.
+STOP_SERVER = False
+
 import subprocess, time
-subprocess.run(["pkill", "-f", "colab_gr00t_server.py"])
-time.sleep(3)
-print("Đã dừng server." if subprocess.run(["pgrep", "-f", "colab_gr00t_server.py"], capture_output=True).returncode
-      else "⚠️ Server vẫn còn chạy; chạy lại cell này.")
+if not STOP_SERVER:
+    print("Không dừng server. Muốn dừng thì đặt STOP_SERVER = True rồi chạy lại cell này.")
+else:
+    subprocess.run(["pkill", "-f", "colab_gr00t_server.py"])
+    time.sleep(3)
+    print("Đã dừng server." if subprocess.run(["pgrep", "-f", "colab_gr00t_server.py"], capture_output=True).returncode
+          else "⚠️ Server vẫn còn chạy; chạy lại cell này.")
 """),
     ]
 
@@ -350,8 +397,54 @@ ls "$DATASET_DIR" "$DATASET_DIR/meta"
 set -euo pipefail
 cd /content/Isaac-GR00T
 source .venv/bin/activate
-python gr00t/data/stats.py --dataset-path "$DATASET_DIR" --embodiment-tag NEW_EMBODIMENT \\
-    --modality-config-path "$MODALITY_CONFIG"
+# Như gr00t/data/stats.py, nhưng thống kê action relative tính song song theo episode: bản gốc lặp tuần tự từng khung
+# bằng Python, riêng 2 khoá EEF (tạo pose, đổi rot6d) mất ~0.9 s/episode, tức ~7 phút với 400 episode.
+# Cùng hàm load_relative_actions, cùng thứ tự episode nên kết quả như bản gốc. Chạy lại trên cùng runtime thì bỏ qua
+# (stats.py tự dùng lại meta/*.json nếu fingerprint khớp).
+python - "$DATASET_DIR" "$MODALITY_CONFIG" <<'EOF'
+import os, sys, time
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")  # mỗi tiến trình con một luồng BLAS
+from multiprocessing import Pool
+import numpy as np
+import gr00t.data.stats as S
+from gr00t.data.types import EmbodimentTag
+
+_loader = None
+
+
+def _init(dataset_path, embodiment_tag, group_key):
+    global _loader
+    _loader = S.RelativeActionLoader(dataset_path, embodiment_tag, group_key)
+
+
+def _load(episode_id):
+    return _loader.load_relative_actions(episode_id)
+
+
+def calculate_stats_for_key(dataset_path, embodiment_tag, group_key, max_episodes=-1):
+    n = len(S.RelativeActionLoader(dataset_path, embodiment_tag, group_key))
+    n = n if max_episodes == -1 else min(n, max_episodes)
+    t0 = time.time()
+    with Pool(os.cpu_count(), initializer=_init, initargs=(dataset_path, embodiment_tag, group_key)) as pool:
+        trajectories = [t for ep in pool.imap(_load, range(n), chunksize=4) for t in ep]
+    print(f"  {group_key}: {n} episode, {time.time() - t0:.0f} s ({os.cpu_count()} tiến trình)", flush=True)
+    return {
+        "max": np.max(trajectories, axis=0),
+        "min": np.min(trajectories, axis=0),
+        "q01": np.quantile(trajectories, 0.01, axis=0),
+        "q99": np.quantile(trajectories, 0.99, axis=0),
+        "mean": np.mean(trajectories, axis=0),
+        "std": np.std(trajectories, axis=0),
+    }
+
+
+S.calculate_stats_for_key = calculate_stats_for_key
+t0 = time.time()
+S.main(sys.argv[1], EmbodimentTag.NEW_EMBODIMENT, sys.argv[2])
+print(f"Thống kê xong trong {time.time() - t0:.0f} s")
+EOF
 python - <<'EOF'
 import os, sys
 sys.path.append(os.path.dirname(os.environ["MODALITY_CONFIG"]))
@@ -538,7 +631,7 @@ ckpt, dataset_dir = ckpts[-1], os.environ["DATASET_DIR"]
 os.environ["CKPT"] = ckpt  # Bước 10 dùng lại
 print("Checkpoint:", ckpt)
 # MPLBACKEND=Agg: Colab đặt backend matplotlib_inline, gói này không có trong môi trường Isaac-GR00T
-!cd /content/Isaac-GR00T && MPLBACKEND=Agg .venv/bin/python gr00t/eval/open_loop_eval.py --model-path "{ckpt}" --dataset-path "{dataset_dir}" --embodiment-tag NEW_EMBODIMENT --traj-ids 0 1 --steps 200 --execution-horizon 16
+!cd /content/Isaac-GR00T && MPLBACKEND=Agg .venv/bin/python gr00t/eval/open_loop_eval.py --model-path "{ckpt}" --dataset-path "{dataset_dir}" --embodiment-tag NEW_EMBODIMENT --traj-ids 0 1 --steps 400 --execution-horizon 16
 """),
         code("""
 # [BƯỚC 10] Chép checkpoint mới nhất về Google Drive để dùng với colab_gr00t_server.ipynb.
@@ -591,7 +684,7 @@ for ds in (os.environ["DATASET_DIR"], TEST_DIR):
 def evaluate(dataset_dir):
     out = subprocess.run(
         [isaac_python, "gr00t/eval/open_loop_eval.py", "--model-path", ckpt, "--dataset-path", dataset_dir,
-         "--embodiment-tag", "NEW_EMBODIMENT", "--traj-ids", *map(str, range(N_EPISODES)), "--steps", "200",
+         "--embodiment-tag", "NEW_EMBODIMENT", "--traj-ids", *map(str, range(N_EPISODES)), "--steps", "400",
          "--execution-horizon", "16"],
         cwd="/content/Isaac-GR00T", env=env, capture_output=True, text=True)
     rows = re.findall(r"MSE for trajectory (\\d+): ([\\d.e-]+), MAE: ([\\d.e-]+)", out.stdout + out.stderr)
