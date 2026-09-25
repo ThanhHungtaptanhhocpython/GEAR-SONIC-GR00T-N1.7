@@ -434,7 +434,7 @@ Cách chia này đã được đối chiếu với tài liệu chính thức tro
 
 Cách ghép này đưa việc giữ thăng bằng và phối hợp chân tay về cho SONIC; GR00T chỉ cần học ý định. Bài báo SONIC, thử nghiệm với GR00T N1.5, cho thấy VLA dự đoán motion token đạt tỉ lệ thành công trung bình 68\% so với 27\% khi dự đoán trực tiếp tư thế SMPL, trên ba nhiệm vụ; ở nhiệm vụ bỏ lon vào thùng rác, khác biệt là 60\% so với 0\%.
 
-Trong dự án của nhóm, vì chưa có dữ liệu motion token, đường chạy hiện dùng khai báo \code{REAL\_G1}: GR00T trả về góc tay, bàn tay, eo; bộ điều khiển bám các góc này ở 50\,Hz và giữ chân ở tư thế đứng. Đây là bước trung gian trước khi chuyển sang pipeline chung đầy đủ.
+Đường chạy hiện tại của nhóm chưa đi qua motion token mà dùng khai báo \code{REAL\_G1} như một bước trung gian; chi tiết ở Chương~\ref{chap:results}.
 
 \section{Triển khai và giao tiếp giữa các thành phần}
 \label{sec:deploy}
@@ -548,9 +548,9 @@ Khi ghép với SONIC, chỉ đầu ra đổi: mỗi khung demo phải có nhãn
 \item Dữ liệu của SONIC: 700 giờ bắt chuyển động của người, huấn luyện tốn 21 nghìn giờ GPU. Nhóm dùng checkpoint có sẵn, không huấn luyện lại. Dữ liệu và quy trình huấn luyện đi kèm repository được mô tả ở Mục~\ref{sec:sonic_data} và~\ref{sec:sonic_train}.
 \item Dữ liệu fine-tune VLA: NVIDIA thu bằng teleoperation VR: người điều khiển làm mẫu, SONIC bám theo trên robot, hệ thống ghi lại ảnh, trạng thái và motion token đang dùng theo định dạng LeRobot v2.1, nên nhãn token có sẵn. Tài liệu khuyến nghị tối thiểu 50 đến 100 demo cho một nhiệm vụ, mỗi demo làm đúng ngay lần đầu. Benchmark thật của NVIDIA với quy trình này đạt 73,6\% ở nhiệm vụ đi tới bàn và nhấc vật, huấn luyện trên khoảng 18 nghìn episode với khoảng 50 vật; và 66,7\% ở nhiệm vụ bỏ lon vào thùng rác, huấn luyện trên khoảng 150 episode.
 \end{itemize}
-Với nhóm, dữ liệu mô phỏng tự sinh không có token sẵn, phải chạy bộ mã hoá của SONIC trên quỹ đạo khớp để tính. Nhóm đã bọc bộ mã hoá này nhưng chưa kiểm chứng xong cách ghép vector đầu vào, nên dữ liệu hiện tại vẫn theo khai báo \code{REAL\_G1}.
+Với dữ liệu mô phỏng tự sinh, nhãn token phải tính bằng cách chạy bộ mã hoá của SONIC trên quỹ đạo khớp; tình trạng việc này ở Chương~\ref{chap:results}.
 
-Sau khi có dữ liệu, GR00T N1.7 được fine-tune dưới tag \code{UNITREE\_G1\_SONIC} rồi chạy theo pipeline ba tần số ở Mục~ef{sec:combine}.
+Sau khi có dữ liệu, GR00T N1.7 được fine-tune dưới tag \code{UNITREE\_G1\_SONIC} rồi chạy theo pipeline ba tần số ở Mục~\ref{sec:combine}.
 
 % ---------------------------------------------------------------------
 \chapter{SO SÁNH VỚI CÁC MÔ HÌNH CÙNG LOẠI}
@@ -605,6 +605,7 @@ Trong dự án của nhóm, quỹ đạo lập trình sẵn chỉ chịu đượ
 
 % ---------------------------------------------------------------------
 \chapter{KẾT QUẢ THỬ NGHIỆM CỦA NHÓM}
+\label{chap:results}
 % ---------------------------------------------------------------------
 Nhóm thử GR00T N1.7 trên mô phỏng MuJoCo với Unitree G1, nhiệm vụ gắp lon Coca-Cola bỏ vào khay đỏ và lon Pepsi bỏ vào khay xanh. Máy cục bộ không có GPU nên mô hình chạy trên Google Colab, mô phỏng chạy cục bộ và nối qua mạng. Ba việc đã làm như sau.
 
