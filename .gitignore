@@ -11,3 +11,17 @@ vla_log*.npz
 snapshots/
 eval/
 third_party/
+
+# LaTeX build artifacts (report/)
+report/build/
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.fdb_latexmk
+report/*.fls
+report/*.synctex.gz
+report/*.docx
+report/*.pdf
