@@ -289,7 +289,7 @@ Tốc độ trên H100 & 27,9\,ms & Với TensorRT; 85,8\,ms nếu chạy PyTorc
 
 \subsection{Xử lý image + text đầu vào}
 
-Câu lệnh được đưa về chữ thường và bỏ dấu câu, rồi ghép với các ảnh thành một lượt hội thoại theo mẫu của Qwen3-VL: ảnh trước, chữ sau. Mô hình ngôn ngữ đọc chuỗi này; qua các lớp attention, token chữ ``red'' gom thông tin từ các token ảnh có vật màu đỏ và ngược lại. GR00T chỉ giữ 16 lớp đầu trong 28 lớp của mô hình ngôn ngữ và không sinh chữ: các lớp giữa cho đặc trưng bám ảnh tốt hơn cho điều khiển, và tiết kiệm tính toán. Đầu ra là chuỗi vector 2048 chiều kèm một mặt nạ đánh dấu token nào là ảnh, token nào là chữ. Toàn bộ backbone đóng băng khi fine-tune; giữa backbone và DiT có thêm một khối nhỏ gồm 4 lớp self-attention được huấn luyện để ``dịch'' đặc trưng cho phù hợp với action head.
+Câu lệnh được đưa về chữ thường và bỏ dấu câu, rồi ghép với các ảnh thành một lượt hội thoại theo mẫu của Qwen3-VL: ảnh trước, chữ sau. Mô hình ngôn ngữ đọc chuỗi này; qua các lớp attention, token chữ ``red'' gom thông tin từ các token ảnh có vật màu đỏ và ngược lại. GR00T chỉ giữ 16 lớp đầu trong 28 lớp của mô hình ngôn ngữ và không sinh chữ: các lớp giữa cho đặc trưng bám ảnh tốt hơn cho điều khiển, và tiết kiệm tính toán. Đầu ra là chuỗi vector 2048 chiều kèm một mask đánh dấu token nào là ảnh, token nào là chữ. Toàn bộ backbone đóng băng khi fine-tune; giữa backbone và DiT có thêm một khối nhỏ gồm 4 lớp self-attention được huấn luyện để ``dịch'' đặc trưng cho phù hợp với action head.
 
 \subsection{Sinh hành động: Diffusion Action Head}
 
