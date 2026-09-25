@@ -73,7 +73,7 @@
 \vfill
 {\large Người thực hiện: \textbf{Nguyễn Duy Hoàng, Phạm Thanh Hưng}\par}
 \vspace{0.3cm}
-{\large Người nhận: [Tên mentor / quản lý]\par}
+{\large Người nhận: Trần Ngọc Sơn\par}
 \vspace{3cm}
 {\large\bfseries Tháng 9 năm 2026\par}
 \vspace{0.5cm}
@@ -97,7 +97,7 @@ Loại tài liệu & Báo cáo kỹ thuật nội bộ\\
 Đối tượng tìm hiểu & Mô hình \code{nvidia/GR00T-N1.7-3B} và bộ điều khiển toàn thân GEAR-SONIC của NVIDIA\\
 Mục đích & Nắm cách mô hình hoạt động ở mức tổng thể, biết nó khác gì và hơn kém gì so với các mô hình cùng loại, và đánh giá khả năng dùng cho bài toán của nhóm\\
 Người thực hiện & Nguyễn Duy Hoàng, Phạm Thanh Hưng\\
-Người nhận & [Tên mentor / quản lý]\\
+Người nhận & Trần Ngọc Sơn\\
 Mã nguồn tham chiếu & Isaac-GR00T (commit \code{51d4c89}); GR00T-WholeBodyControl v1.1; dự án nội bộ GEAR-SONIC-GR00T-N1.7\\
 Thời gian & Tháng 9 năm 2026\\
 \bottomrule
@@ -640,11 +640,11 @@ B & Như A, thêm cảnh hai lon đổi phía; giữ yên 2,5\,s cuối episode 
 \end{table}
 
 \begin{itemize}
-\item \textbf{Pilot.} Hành động gần như không phụ thuộc vị trí lon nên mô hình có thể học thuộc quỹ đạo thay vì học nhìn. Demo pilot chỉ chừa 0,7\,cm biên dư: mô phỏng chỉ cho kẹp khi điểm gắp trong lòng bàn tay cách tâm lon không quá 5\,cm, còn demo khép tay ở 4,3\,cm.
-\item \textbf{Phiên bản A} (\code{g1\_can\_sort\_ik}). Bộ lập kế hoạch giải động học ngược cho từng episode, có kiểm tra va chạm và tự chọn đường vòng. Lon đứng được gắp ngang; lon nằm được úp tay từ trên xuống, xoay 35 độ quanh trục lon để ngón cái không chạm bàn. Khi thu, bộ lập kế hoạch thành công 97--99\% với lon đứng và 73--76\% với lon nằm. Biên dư kẹp tăng lên 2,6 đến 4,5\,cm. Coca luôn nằm bên phải, Pepsi luôn bên trái, cùng phía với tay gắp và khay của nó.
-\item \textbf{Phiên bản B} (\code{g1\_can\_sort\_swap\_hold}). Ở dữ liệu A, mô hình có thể đi lối tắt ``lệnh Coca thì dùng tay phải, gắp lon bên phải'' mà không cần phân biệt màu. B cho cả hai lon đổi phía với xác suất 0,7; mỗi lon vẫn do tay cùng phía với khay của nó gắp, nên tay phải phải vươn chéo người, có xoay eo tới $\pm 0{,}6$\,rad. Kiểm tra va chạm tính cả lon đang cầm và chừa 1\,cm quanh lon còn lại. Gắp chéo khó: bộ lập kế hoạch chỉ thành công 22--25\% với lon đứng đổi phía (lỗi chính là cẳng tay va lon kia) và 64--76\% với lon nằm đổi phía, nên phần đổi phía của B lệch về lon nằm (52 đứng, 148 nằm).
-\item \textbf{Giữ yên cuối episode.} Demo A kết thúc 0,7\,s sau khi đặt lon; khi chạy lâu hơn, mô hình A gắp lon từ khay ra lại. B kéo dài đoạn đứng yên lên 2,5\,s.
-\item \textbf{Kiểm tra.} Chỉ giữ episode thành công và phát lại được: phát lại 400/400 episode train và 40/40 episode kiểm tra ở cả A và B. Có công cụ kiểm tra định dạng, vẽ phân bố vị trí lon để bảo đảm tập kiểm tra không trùng tập huấn luyện, và đo khoảng hở giữa cánh tay với lon còn lại trong từng demo.
+\item Pilot. Hành động gần như không phụ thuộc vị trí lon nên mô hình có thể học thuộc quỹ đạo thay vì học nhìn. Demo pilot chỉ chừa 0,7\,cm biên dư: mô phỏng chỉ cho kẹp khi điểm gắp trong lòng bàn tay cách tâm lon không quá 5\,cm, còn demo khép tay ở 4,3\,cm.
+\item Phiên bản A (\code{g1\_can\_sort\_ik}). Bộ lập kế hoạch giải động học ngược cho từng episode, có kiểm tra va chạm và tự chọn đường vòng. Lon đứng được gắp ngang; lon nằm được úp tay từ trên xuống, xoay 35 độ quanh trục lon để ngón cái không chạm bàn. Khi thu, bộ lập kế hoạch thành công 97--99\% với lon đứng và 73--76\% với lon nằm. Biên dư kẹp tăng lên 2,6 đến 4,5\,cm. Coca luôn nằm bên phải, Pepsi luôn bên trái, cùng phía với tay gắp và khay của nó.
+\item Phiên bản B (\code{g1\_can\_sort\_swap\_hold}). Ở dữ liệu A, mô hình có thể đi lối tắt ``lệnh Coca thì dùng tay phải, gắp lon bên phải'' mà không cần phân biệt màu. B cho cả hai lon đổi phía với xác suất 0,7; mỗi lon vẫn do tay cùng phía với khay của nó gắp, nên tay phải phải vươn chéo người, có xoay eo tới $\pm 0{,}6$\,rad. Kiểm tra va chạm tính cả lon đang cầm và chừa 1\,cm quanh lon còn lại. Gắp chéo khó: bộ lập kế hoạch chỉ thành công 22--25\% với lon đứng đổi phía (lỗi chính là cẳng tay va lon kia) và 64--76\% với lon nằm đổi phía, nên phần đổi phía của B lệch về lon nằm (52 đứng, 148 nằm).
+\item Giữ yên cuối episode. Demo A kết thúc 0,7\,s sau khi đặt lon; khi chạy lâu hơn, mô hình A gắp lon từ khay ra lại. B kéo dài đoạn đứng yên lên 2,5\,s.
+\item Kiểm tra. Chỉ giữ episode thành công và phát lại được: phát lại 400/400 episode train và 40/40 episode kiểm tra ở cả A và B. Có công cụ kiểm tra định dạng, vẽ phân bố vị trí lon để bảo đảm tập kiểm tra không trùng tập huấn luyện, và đo khoảng hở giữa cánh tay với lon còn lại trong từng demo.
 \end{itemize}
 
 \section{Fine-tune trên Google Colab}
@@ -653,9 +653,9 @@ B & Như A, thêm cảnh hai lon đổi phía; giữ yên 2,5\,s cuối episode 
 Cả ba checkpoint fine-tune từ checkpoint gốc \code{nvidia/GR00T-N1.7-3B} dưới tag \code{NEW\_EMBODIMENT}. Phần được huấn luyện gồm các tầng cuối của backbone (khoảng 0,2 tỉ tham số), DiT (khoảng 1,09 tỉ) và projector riêng của robot; bộ mã hoá ảnh và LLM đóng băng.
 
 \begin{itemize}
-\item \textbf{Pilot}: dữ liệu pilot, GPU L4, batch 32, 5\,000 bước.
-\item \textbf{A-10000}: dữ liệu A, GPU A100 80\,GB, batch 64, 10\,000 bước, khoảng 8,5 lần đi qua dữ liệu. Loss giảm từ 1,33 xuống 0,0041, không có spike.
-\item \textbf{B-9000}: dữ liệu B, cùng batch với A, lấy checkpoint ở bước 9\,000. Train từ checkpoint gốc, không từ A.
+\item Pilot: dữ liệu pilot, GPU L4, batch 32, 5\,000 bước.
+\item A-10000: dữ liệu A, GPU A100 80\,GB, batch 64, 10\,000 bước, khoảng 8,5 lần đi qua dữ liệu. Loss giảm từ 1,33 xuống 0,0041, không có spike.
+\item B-9000: dữ liệu B, cùng batch với A, lấy checkpoint ở bước 9\,000. Train từ checkpoint gốc, không từ A.
 \end{itemize}
 
 \subsection{Kết quả open-loop}
@@ -713,25 +713,23 @@ B & Tất cả & 40 & 14 (35\%) & 23 (58\%)\\
 
 Nhận định:
 \begin{itemize}
-\item \textbf{A đi lối tắt đúng như dự đoán.} Ở cảnh đổi phía A đạt 0/26: tay đi về lon nằm bên phía mình, 20 ca xô lon còn lại, trung bình khép tay 6,8 lần mỗi episode. Ở cảnh cùng phía A đạt 14/14.
-\item \textbf{B học được nhìn màu lon}: 10/22 ca lon nằm đổi phía, và không kém A ở cảnh cùng phía (31 so với 30 trên tập A), dù B chỉ có 200 episode cùng phía, bằng một nửa A. Hai checkpoint hỏng ở các episode khác nhau (cả hai thành công 26, chỉ A 4, chỉ B 5), nên trên 40 episode chưa phân biệt được A với B ở cảnh cùng phía.
-\item \textbf{Lon đứng đổi phía hỏng hoàn toàn} ở cả A và B (0/4). Trong demo nhóm này, cánh tay đi cách lon kia trung vị dưới 1\,cm trước khi kẹp; mô hình lệch 1\,cm là đủ va.
-\item \textbf{Lon nằm là điểm yếu chung} (13/22 ở cả hai). Hai nguyên nhân: (1) mô hình khép tay thiếu tầm 1 đến 3\,cm theo hướng tiến vào lon và lệch ra ngoài 0,4 đến 1,8\,cm, lệch có hướng cố định chứ không phải nhiễu (đo trên A, lớn nhất ở Coca nằm với 3,1\,cm); (2) ở vùng hướng lon mà dữ liệu đổi kiểu gắp, mô hình đổi ý giữa hai chunk, chuyển từ tiếp cận ngang sang úp từ trên xuống, đụng lon làm rơi khỏi bàn. Mỗi lần gọi mô hình (0,3\,s) lấy nhiễu mới nên chunk kế tiếp có thể rơi vào kiểu kia. Giãn khoảng gọi lên 0,6\,s không giúp: 7/10 so với 9/10 trên cùng 10 episode.
-\item \textbf{Mô hình không biết khi nào xong.} Với A, 2/27 ca đặt xong rồi gắp lon ra lại. B giữ yên 2,5\,s nên sửa được các ca này, nhưng nếu cứ chạy tiếp 20\,s thì 3/4 ca hỏng trong 8 episode thử xảy ra sau khi đã xong. Vì vậy đánh giá dừng ngay khi thành công.
-\item \textbf{Dữ liệu gắn với bộ điều khiển chân.} Bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, B-9000 giảm từ 31/40 xuống 18/40 trên tập A. Phát lại nguyên hành động của demo, không dùng mô hình, cũng chỉ còn 8/14 cảnh cùng phía và 9/26 cảnh đổi phía (khoá cứng: 14/14 và 26/26). Khi chân khoá, thân robot vẫn ngả và hông trôi trung bình 5 đến 7\,cm, tối đa 13\,cm lúc vươn tay; bộ lập kế hoạch đã bù chuyển động này nên góc khớp trong demo chỉ đúng với chế độ khoá cứng.
+\item A đi lối tắt đúng như dự đoán. Ở cảnh đổi phía A đạt 0/26: tay đi về lon nằm bên phía mình, 20 ca xô lon còn lại, trung bình khép tay 6,8 lần mỗi episode. Ở cảnh cùng phía A đạt 14/14.
+\item B học được nhìn màu lon: 10/22 ca lon nằm đổi phía, và không kém A ở cảnh cùng phía (31 so với 30 trên tập A), dù B chỉ có 200 episode cùng phía, bằng một nửa A. Hai checkpoint hỏng ở các episode khác nhau (cả hai thành công 26, chỉ A 4, chỉ B 5), nên trên 40 episode chưa phân biệt được A với B ở cảnh cùng phía.
+\item Lon đứng đổi phía hỏng hoàn toàn ở cả A và B (0/4). Trong demo nhóm này, cánh tay đi cách lon kia trung vị dưới 1\,cm trước khi kẹp; mô hình lệch 1\,cm là đủ va.
+\item Lon nằm là điểm yếu chung (13/22 ở cả hai). Hai nguyên nhân: (1) mô hình khép tay thiếu tầm 1 đến 3\,cm theo hướng tiến vào lon và lệch ra ngoài 0,4 đến 1,8\,cm, lệch có hướng cố định chứ không phải nhiễu (đo trên A, lớn nhất ở Coca nằm với 3,1\,cm); (2) ở vùng hướng lon mà dữ liệu đổi kiểu gắp, mô hình đổi ý giữa hai chunk, chuyển từ tiếp cận ngang sang úp từ trên xuống, đụng lon làm rơi khỏi bàn. Mỗi lần gọi mô hình (0,3\,s) lấy nhiễu mới nên chunk kế tiếp có thể rơi vào kiểu kia. Giãn khoảng gọi lên 0,6\,s không giúp: 7/10 so với 9/10 trên cùng 10 episode.
+\item Mô hình không biết khi nào xong. Với A, 2/27 ca đặt xong rồi gắp lon ra lại. B giữ yên 2,5\,s nên sửa được các ca này, nhưng nếu cứ chạy tiếp 20\,s thì 3/4 ca hỏng trong 8 episode thử xảy ra sau khi đã xong. Vì vậy đánh giá dừng ngay khi thành công.
+\item Dữ liệu gắn với bộ điều khiển chân. Bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, B-9000 giảm từ 31/40 xuống 18/40 trên tập A. Phát lại nguyên hành động của demo, không dùng mô hình, cũng chỉ còn 8/14 cảnh cùng phía và 9/26 cảnh đổi phía (khoá cứng: 14/14 và 26/26). Khi chân khoá, thân robot vẫn ngả và hông trôi trung bình 5 đến 7\,cm, tối đa 13\,cm lúc vươn tay; bộ lập kế hoạch đã bù chuyển động này nên góc khớp trong demo chỉ đúng với chế độ khoá cứng.
 \end{itemize}
 
 \section{Bài học rút ra}
 
+Từ ba việc trên, nhóm rút ra các bài học sau, xếp theo thứ tự của chương.
+
 \begin{itemize}
-\item Quy trình fine-tune của Isaac-GR00T chạy được trên Colab: GPU L4 đủ cho 5\,000 bước batch 32; muốn batch 64 và 10\,000 bước thì cần A100 80\,GB. Không cần cụm GPU lớn cho bài toán nhỏ.
-\item Sai số open-loop thấp không nói lên tỉ lệ thành công. Pilot có MAE 0,005, khoảng 0,3 độ, nhưng closed-loop chỉ 3/10. Phải đo closed-loop trên tập cảnh cố định, tách theo nhóm cảnh.
-\item Dữ liệu phải chặn được lối tắt. A không cần nhìn màu lon vì vị trí đã đủ để đoán, và hỏng 26/26 cảnh đổi phía; thêm cảnh đổi phía vào B là đủ để mô hình bắt đầu phân biệt hai lon.
-\item Demo phải chừa biên dư lớn hơn sai số của mô hình, khoảng 1 đến 3\,cm: biên dư kẹp, khoảng hở với lon còn lại. Demo đi sát lon kia dưới 1\,cm thì mô hình học theo sẽ va.
-\item Demo phải nhất quán: cùng một cảnh thì cùng một kiểu gắp. Hai kiểu gắp cho những cảnh gần nhau làm mô hình lưỡng lự giữa các chunk.
-\item Dữ liệu gắn với bộ điều khiển tầng dưới lúc thu. Muốn đổi sang chế độ chân tự giữ thăng bằng phải thu lại demo và train lại.
-\item Phần tốn công nhất không phải huấn luyện mà là khớp dữ liệu với mô hình: thứ tự khớp, hệ toạ độ, thống kê chuẩn hoá, góc camera. Sai một chỗ là mô hình vô dụng mà không báo lỗi.
-\item Muốn dùng whole-body control thật sự phải giải quyết nhãn motion token; đây là điểm nghẽn để chuyển từ chế độ bám góc khớp sang SONIC đầy đủ.
+\item Về nối mô hình với robot: phần tốn công nhất không phải huấn luyện mà là khớp dữ liệu với mô hình, gồm thứ tự khớp, hệ toạ độ, thống kê chuẩn hoá và góc camera. Sai một chỗ là mô hình cho quỹ đạo vô nghĩa mà không báo lỗi. Dữ liệu demo cũng gắn chặt với bộ điều khiển tầng dưới lúc thu: bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, B-9000 giảm từ 31/40 xuống 18/40, nên muốn đổi bộ điều khiển thì phải thu lại demo và huấn luyện lại.
+\item Về dữ liệu demo: dữ liệu phải chặn được lối tắt. Với dữ liệu A, vị trí lon đã đủ để đoán nên mô hình không cần nhìn màu và hỏng 26/26 cảnh đổi phía; chỉ cần thêm cảnh đổi phía ở dữ liệu B là mô hình bắt đầu phân biệt hai lon. Demo phải chừa biên dư lớn hơn sai số của mô hình, khoảng 1 đến 3\,cm, cả ở biên dư kẹp lẫn khoảng hở với lon còn lại; demo đi sát lon kia dưới 1\,cm thì mô hình học theo sẽ va. Demo phải nhất quán: cùng một cảnh thì cùng một kiểu gắp, vì hai kiểu gắp cho những cảnh gần nhau làm mô hình đổi ý giữa hai chunk.
+\item Về fine-tune và đánh giá: quy trình fine-tune của Isaac-GR00T chạy được trên Colab, GPU L4 đủ cho 5\,000 bước với batch 32, A100 80\,GB cho batch 64 và 10\,000 bước; không cần cụm GPU lớn cho bài toán nhỏ. Sai số open-loop thấp không nói lên tỉ lệ thành công: checkpoint pilot có MAE 0,005, khoảng 0,3 độ, nhưng closed-loop chỉ đạt 3/10. Phải đo closed-loop trên một tập cảnh cố định và tách theo nhóm cảnh mới thấy mô hình hỏng ở đâu.
+\item Về whole-body control: muốn dùng SONIC thật sự phải giải quyết nhãn motion token. Đây là điểm nghẽn để chuyển từ chế độ bám góc khớp sang pipeline chung đầy đủ ở Mục~\ref{sec:combine}.
 \end{itemize}
 
 % ---------------------------------------------------------------------
