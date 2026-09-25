@@ -240,9 +240,12 @@ def main():
         choices=["kinematic", "onnx"],
         help="Chế độ giải mã WBC: kinematic (đứng vững & gắp lon ổn định, mặc định) hoặc onnx (mạng nơ-ron GEAR-SONIC).",
     )
-    parser.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
-                        help="fixed: chân khoá cứng như lúc thu demo (mặc định); balance: policy thăng bằng của NVIDIA "
-                             "GR00T-WholeBodyControl điều khiển chân + eo (bridge/lower_body_policy.py)")
+    parser.add_argument("--debug-keys", action="store_true",
+                        help="In mã phím mà viewer chuyển cho script (F8-F12 phải ra 297-301), để kiểm tra phím F")
+    parser.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
+                        help="fixed: chân khoá cứng; balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều "
+                             "khiển chân + eo (bridge/lower_body_policy.py). Mặc định: theo cfg của episode khi dùng "
+                             "--scene-dataset (dataset trước 25/09: fixed), còn lại fixed")
     parser.add_argument("--stop-on-success", action=argparse.BooleanOptionalAction, default=True,
                         help="Đặt xong lon thì ngừng gọi model, giữ tư thế ready tới khi bấm F10/F11/F8/F9 (mặc định bật)")
     args = parser.parse_args()
@@ -280,6 +283,10 @@ def main():
     current_task = TASK_OF_KEY[args.task]
     if scenes is not None and scenes.episodes is not None:
         current_task = scenes.current(current_task)[0]
+    if args.lower_body is None:
+        # Pipeline tạo một lần nên chế độ chân lấy theo episode đầu; F11 sang episode khác không đổi chế độ
+        use_cfg = scenes is not None and scenes.episodes is not None
+        args.lower_body = scenes.current(current_task)[2].get("lower_body", "fixed") if use_cfg else "fixed"
     key_of_task = {t: k for k, t in TASK_OF_KEY.items()}
     init_prompt = args.prompt if args.prompt else TASK_PROMPTS[key_of_task[current_task]]
 
@@ -346,6 +353,8 @@ def main():
     # Hàm callback xử lý phím bấm trong cửa sổ MuJoCo 3D Viewer (Chạy trên GLFW GUI thread)
     def key_callback(keycode: int):
         nonlocal pending_prompt, reset_requested, snapshot_requested, next_scene_requested, current_task
+        if args.debug_keys:
+            print(f"[phím] keycode = {keycode}")
         if keycode == KEY_F8:
             pending_prompt = TASK_PROMPTS["1"]
             current_task = "coke"
@@ -354,8 +363,11 @@ def main():
             pending_prompt = TASK_PROMPTS["2"]
             current_task = "pepsi"
             print(f"\n👉 [F9] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
-        elif scenes is not None and keycode == KEY_F11:
-            next_scene_requested = True
+        elif keycode == KEY_F11:
+            if scenes is not None:
+                next_scene_requested = True
+            else:
+                print("\n⚠️  [F11] Không có danh sách cảnh: khởi động với --scene-seed N hoặc --scene-dataset DIR để dùng F11.")
         # Phím SPACE (ASCII 32): Pause / Resume
         elif keycode in (ord(" "), 32):
             pipeline.is_paused = not pipeline.is_paused

@@ -81,7 +81,7 @@ def replay_episode(job):
     """Phát lại action của một episode qua đường chạy model; trả về (episode, thành công, lệch khớp tay lớn nhất)."""
     import pyarrow.parquet as pq
 
-    root, rec = job
+    root, rec, lower_body = job
     root = Path(root)
     info = json.loads((root / "meta" / "info.json").read_text())
     modality = json.loads((root / "meta" / "modality.json").read_text())
@@ -91,7 +91,8 @@ def replay_episode(job):
     action = np.asarray(table["action"], dtype=np.float32)
     state = np.asarray(table["observation.state"], dtype=np.float32)
 
-    ok, replayed = replay_actions(rec["task"], rec["seed"], rec["cfg"], action)
+    kwargs = {"lower_body": lower_body} if lower_body else None
+    ok, replayed = replay_actions(rec["task"], rec["seed"], rec["cfg"], action, pipeline_kwargs=kwargs)
     arm = np.r_[modality["state"]["left_arm"]["start"]:modality["state"]["right_arm"]["end"]]
     return rec["episode_index"], ok, float(np.abs(replayed[:, arm] - state[:, arm]).max())
 
@@ -102,6 +103,8 @@ def main():
     parser.add_argument("--replay", type=int, default=-1, help="Số episode phát lại (-1 = tất cả, 0 = bỏ qua)")
     parser.add_argument("--workers", type=int, default=min(12, max(1, (os.cpu_count() or 2) - 2)),
                         help="Số tiến trình (mỗi tiến trình cần tới ~1 GB RAM)")
+    parser.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
+                        help="Ghi đè chế độ chân khi phát lại (mặc định: theo cfg lúc thu, dataset cũ là fixed)")
     args = parser.parse_args()
     root = Path(args.dataset)
 
@@ -116,7 +119,7 @@ def main():
         # Mỗi tiến trình chỉ chạy một episode rồi thoát: tạo pipeline lặp lại trong cùng tiến trình rò rỉ
         # ~150 MB mỗi episode (model MuJoCo, renderer EGL, ONNX session) và làm tràn RAM
         with Pool(args.workers, maxtasksperchild=1) as pool:
-            results = pool.map(replay_episode, [(str(root), r) for r in records], chunksize=1)
+            results = pool.map(replay_episode, [(str(root), r, args.lower_body) for r in records], chunksize=1)
         failed = [i for i, ok, _ in results if not ok]
         devs = np.array([dev for _, _, dev in results])
         print(f"2. Phát lại: {len(results) - len(failed)}/{len(results)} episode thành công | "

@@ -44,6 +44,15 @@ def grasp_distance(sim, grasp, can_adr) -> float:
     return float(np.linalg.norm(point - d.qpos[can_adr:can_adr + 3]))
 
 
+def grasp_offset_pelvis_cm(sim, grasp, can_adr) -> list:
+    """Vector từ tâm lon tới điểm gắp trong khung pelvis (cm; x trước, y trái, z lên), để xem model lệch theo hướng nào."""
+    d = sim.data
+    w_rot = d.xmat[grasp["wrist_bid"]].reshape(3, 3)
+    point = d.xpos[grasp["wrist_bid"]] + w_rot @ grasp["grasp_point"]
+    p_rot = d.xmat[sim.pelvis_bid].reshape(3, 3)
+    return (p_rot.T @ (point - d.qpos[can_adr:can_adr + 3]) * 100).round(2).tolist()
+
+
 def pelvis_pitch_deg(qpos) -> float:
     w, x, y, z = qpos[3:7]
     return float(np.degrees(np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))))
@@ -73,8 +82,10 @@ def run_episode(job) -> dict:
     task, seed, cfg, args = job
     from PIL import Image
 
+    # Chế độ chân: theo --lower-body nếu có, không thì theo cfg của episode (dataset cũ: fixed)
+    lower_body = args["lower_body"] or cfg.get("lower_body", "fixed")
     pipe_kwargs = {"policy_mode": "remote", "server_host": args["host"], "server_port": args["port"],
-                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": args["lower_body"],
+                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": lower_body,
                    "policy_replan_interval": args["replan_steps"]}
     pipe, ctx = cd.setup_episode(task, seed, cfg, pipeline_kwargs=pipe_kwargs)
     sim, policy = pipe.sim, pipe.policy
@@ -101,12 +112,13 @@ def run_episode(job) -> dict:
     rand = cd.sample_randomization(task, seed, cfg)
     lying, swapped = rand["cans"][can]["lying"], rand["swapped"]
     can_start = sim.data.qpos[can_adr:can_adr + 3].copy()
-    d_close = t_grasp = t_success = None
+    d_close = offset_close = t_grasp = t_success = None
     attempts, was_closed = 0, False  # số lần khép tay (cạnh lên), để thấy model có thử lại không
     can_max_z, max_pitch = -np.inf, 0.0
     frames = []
     for step in range(int(args["seconds"] * CONTROL_HZ)):
         dist = grasp_distance(sim, grasp, can_adr)
+        offset = grasp_offset_pelvis_cm(sim, grasp, can_adr)  # cùng thời điểm với dist
         was_grasped = sim.is_grasped(can)
         with contextlib.redirect_stdout(io.StringIO()):
             res = pipe.step_50hz()
@@ -127,6 +139,7 @@ def run_episode(job) -> dict:
         closure = float(np.mean(np.abs(res["motor_targets"][grasp["hand_ctrl"]][1:])))
         if d_close is None and closure > sim.GRIP_CLOSED_RAD:
             d_close = dist
+            offset_close = offset
         attempts += closure > sim.GRIP_CLOSED_RAD and not was_closed
         was_closed = closure > sim.GRIP_CLOSED_RAD
         if t_grasp is None and not was_grasped and sim.is_grasped(can):
@@ -149,6 +162,7 @@ def run_episode(job) -> dict:
         "in_tray": cd.is_success(pipe, ctx, check_other=False),
         "grasped": t_grasp is not None, "t_grasp": t_grasp,
         "dist_at_close_cm": None if d_close is None else round(d_close * 100, 2),
+        "offset_at_close_cm": offset_close,
         "can_start": can_start.round(3).tolist(), "can_final": d.qpos[can_adr:can_adr + 3].round(3).tolist(),
         "can_max_lift_cm": round(float(can_max_z - can_start[2]) * 100, 1),
         "can_fell": bool(d.qpos[can_adr + 2] < can_start[2] - 0.2),
@@ -156,7 +170,7 @@ def run_episode(job) -> dict:
         "other_moved_cm": round(float(np.linalg.norm(d.qpos[other_adr:other_adr + 3] - ctx["other_start"])) * 100, 1),
         "max_pitch_deg": round(max_pitch, 1),
         "policy_calls": counts["policy_calls"], "server_errors": counts["server_errors"],
-        "server_model": policy.server_model, "lower_body": args["lower_body"], "replan_steps": args["replan_steps"],
+        "server_model": policy.server_model, "lower_body": lower_body, "replan_steps": args["replan_steps"],
         "stop_on_success": args["stop_on_success"],
     }
     r["reason"] = failure_reason(r)
@@ -247,8 +261,9 @@ def main():
     p.add_argument("--replan-steps", type=int, default=15,
                    help="Số bước 50 Hz chạy theo một action chunk trước khi gọi model lần sau (15 = 0.3 s). Tăng (ví dụ "
                         "30) để model ít đổi ý giữa các chunk, như lúc tay lưỡng lự giữa hai kiểu gắp lon nằm")
-    p.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
-                   help="fixed: chân khoá cứng như lúc thu demo; balance: policy thăng bằng của NVIDIA điều khiển chân + eo")
+    p.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
+                   help="fixed: chân khoá cứng; balance: policy thăng bằng của NVIDIA điều khiển chân + eo. Mặc định theo "
+                        "cfg của episode (lower_body lúc thu demo; dataset trước 25/09: fixed)")
     p.add_argument("--expect-embodiment", default="new_embodiment",
                    help="Dừng nếu server báo embodiment khác (mặc định: checkpoint fine-tune). '' để bỏ kiểm tra")
     p.add_argument("--workers", type=int, default=2,

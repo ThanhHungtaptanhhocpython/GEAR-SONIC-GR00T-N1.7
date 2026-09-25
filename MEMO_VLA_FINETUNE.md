@@ -788,6 +788,320 @@ Coca nằm 6/10, Pepsi nằm 5/6. Mẫu còn nhỏ, nhưng Coca nằm là nhóm 
 - Xô lon còn lại là điểm khó riêng của ca đổi phía: tay đi chéo sát lon kia. Planner chỉ chừa được khoảng 1 cm (mục 4.5), nên
   model lệch khoảng 1 cm là đủ đụng lon.
 
+### 5.2i. `--lower-body balance` làm B-9000 hỏng nặng: quỹ đạo demo phụ thuộc vào việc thân robot ngả (25/09)
+- Closed-loop, 20 s + `--stop-on-success`, balance so với fixed:
+  - `ik_test`: **18/40** (fixed 31/40).
+  - `swap_test`, 15 episode chung: **5/15** (fixed 9/15). Mọi ca đổi phía đều hỏng (0/9); ca cùng phía 5/6.
+  - Khoảng cách lúc khép tay TB 11.7 cm (fixed 4.3), nghiêng max 4.5° (fixed 14°). Lượt swap balance dừng ở 34/40 lúc 10:55
+    vì file XML cảnh bị sửa hỏng (xem dưới).
+- Balance vẫn bám góc eo mà VLA ra lệnh: đứng yên 3 s với lệnh waist_yaw ±0.6 thì eo thực ±0.63–0.64, pitch thấp hơn
+  khoảng 0.02–0.04.
+- **Phép thử quyết định:** phát lại nguyên action của 40 demo `g1_can_sort_swap_hold_test`, không dùng model, trên bản HEAD sạch:
+
+  | Chế độ | Cùng phía | Đổi phía | Lon nằm / đứng | Pelvis dịch TB (max) |
+  |---|---|---|---|---|
+  | fixed | 14/14 | 26/26 | 28/28 / 12/12 | 5–7 cm (13.4) |
+  | balance | **8/14** | **9/26** | 13/28 / 4/12 | 2.3–2.5 cm (6.6) |
+
+  Balance xô lon còn lại ở 10/26 ca đổi phía.
+- **Kết luận:**
+  - Ở chế độ fixed, chân khoá nhưng thân vẫn ngả và pelvis trôi 5–13 cm khi vươn tay. Planner IK online đã bù chuyển động
+    này, nên góc khớp trong demo gắn với cách thân ngả của chế độ fixed.
+  - Balance giữ thân đứng yên, nên cùng góc khớp đưa tay tới chỗ lệch vài cm: hụt lon, và ở ca đổi phía thì quét trúng lon kia.
+  - Model train trên dữ liệu fixed không thể chạy balance. Lần thử ở mục 5.2f đạt kết quả tốt chỉ vì planner chạy online và
+    tự bù.
+  - Muốn dùng balance thì phải **thu lại demo với `--lower-body balance`** rồi train lại. Đây là Phase 1 của plan mục 6.
+  - Tới lúc đó, mọi eval dùng `fixed`.
+- **Cảnh báo, 25/09 10:55:** `sim/unitree_g1/scene_pepsi_coke_sorting.xml` bị sửa ngoài phiên này. File có hai dòng
+  `<body>` cho mỗi lon và khay, vị trí và ma sát khác, mất weld kẹp `coke_grasp`/`pepsi_grasp`, thêm weld
+  `pelvis_standing_support`, và **không parse được** (dòng 89). `colab_gr00t_server.py` (bản cũ, action_space
+  `sonic_tokens`) và `SIMULATION_READINESS_CHECKLIST.md` cũng đổi. **Đã khôi phục** cả ba file về bản commit `a5e70aa`
+  theo yêu cầu người dùng (`git checkout --`): XML parse lại được, `verify_pipeline.py` qua 5/5 test.
+
+### 5.2j. GUI: tay dị dạng khi gắp lon Coca nằm (25/09, tunnel `rxyom-…:36755`)
+- Ảnh chụp khớp với `--scene-seed 200010 --swap-prob 0.5`: Coca nằm ở (0.360, −0.099), yaw gập 59°, cùng phía; Pepsi đứng
+  ở (0.282, 0.077). Lon ở sát mép xa của vùng train (x tối đa 0.37). Trong ảnh, tay model thấp sát bàn và lon đã bị đẩy lệch.
+- **Planner trên cùng cảnh:** gắp gọn, tay giơ cao rồi úp từ trên xuống (kiểu "+"), thành công.
+- **Dữ liệu train quanh cảnh này** (Coca nằm cùng phía):
+  - A (`g1_can_sort_ik`, planner cũ): 3/6 láng giềng gần nhất (ep 236, 346, 358) có cổ tay gập hết cỡ và xoắn
+    (pitch 1.45, yaw −1.2..−1.56), đúng tư thế dị dạng ở mục 4.2b. Cả dataset có 15/181 episode lon nằm như vậy (Coca 8/92).
+  - B (`g1_can_sort_swap_hold`, planner đã sửa): 0/225 tư thế dị dạng. Nhưng không có episode nào trong vòng 3 cm và 20°
+    quanh cảnh này; gần nhất lệch 2.7 cm/21° và 4.5 cm/11°. Chỉ 10/39 episode Coca nằm cùng phía có x > 0.35.
+- Chạy lại model trên cảnh này thì server không phản hồi (tunnel hết hạn), nên chưa xác định được checkpoint lúc đó.
+  - Nếu là A-10000: model học đúng tư thế dị dạng có trong dữ liệu của A.
+  - Nếu là B-9000: model phải ngoại suy ở mép vùng train, nơi dữ liệu thưa.
+- Lần sau chạy GUI với `--record-vla vla_log_<tên>.npz` để lưu góc khớp model ra lệnh.
+
+### 5.2k. Bước 0b: kiểm chứng nhận xét về dữ liệu B bằng `tools/demo_quality.py` (25/09)
+- Công cụ mới:
+  - `sim/episode_metrics.py` (`EpisodeMetrics`): khoảng hở nhỏ nhất (mj_geomDistance, geom va chạm của cánh tay gắp + lon đang
+    cầm) tới lon còn lại theo pha trước kẹp / đang kẹp / sau nhả; chạm lon còn lại; ngả, trượt, yaw pelvis; thân dưới chạm bàn;
+    vector lệch điểm gắp lúc khép tay trong khung pelvis.
+  - `collect_demos.replay_actions(..., observer=...)` gọi observer sau mỗi bước sim.
+  - `tools/demo_quality.py DATASET [--eval DIR ...] [--reuse]`: phát lại toàn bộ dataset (400 episode khoảng 3 phút, 12
+    worker), ghi `eval/demo_quality/<dataset>.jsonl/.txt`, nối với eval theo (task, seed).
+  - `tools/eval_closed_loop.py` ghi thêm `offset_at_close_cm` (lệch điểm gắp so với tâm lon trong khung pelvis) để lần eval
+    sau xem được model lệch theo hướng nào. Các eval cũ chưa có trường này.
+- Dataset train B (`g1_can_sort_swap_hold`, phát lại 400/400, chân fixed). Khoảng hở tính bằng cm: trung vị / tỉ lệ < 2 cm:
+
+  | Nhóm | n | Trước kẹp | Đang kẹp | Chạm lon kia | Thân chạm bàn |
+  |---|---|---|---|---|---|
+  | Cùng phía đứng | 123 | 11.4 / 0% | 11.5 / 0% | 0 | 0 |
+  | Cùng phía nằm | 77 | 7.2 / 10% | 8.4 / 4% | 0 | 17 |
+  | Đổi phía đứng | 52 | 0.8 / 92% | 2.0 / 46% | 6 | 0 |
+  | Đổi phía nằm | 148 | 2.1 / 49% | 1.7 / 55% | 13 | 39 |
+
+  - Khớp với nhận xét: đổi phía 1.4 / 60% trước kẹp, 1.9 / 53% đang kẹp; 52/200 đổi phía là lon đứng; yaw ≥ 7.5° ở 10% ca đổi
+    phía, max 12.6°; 19 demo (10% ca đổi phía) chạm hẳn lon kia.
+  - Thân chạm bàn: **56** episode (nhận xét đếm 49, có lẽ chỉ tính pelvis), đều là lon nằm, trượt trung vị 13.2 cm, ngả 12.5°.
+  - Demo khép tay cách tâm lon trung vị 0.9 cm. Ngả cuối episode khoảng 2.9°.
+- Nối với B-9000, `swap_hold_test`, fixed (`eval/B9000_swap_test_20s_stop`), ca đổi phía: model ok 10 ep, demo đang kẹp
+  trung vị 5.4 cm và không ca nào < 2 cm; model hỏng 16 ep, trung vị 2.6 cm, 44% < 2 cm. Lỗi "đặt đúng khay nhưng xô lon còn lại"
+  (8 ep) có demo trung vị 1.6 cm. Lon đứng đổi phía: demo trước kẹp 0.4 cm, model 0/4.
+- **Không phải do hai lon đặt sát nhau:** chia ca đổi phía theo khoảng hở hai lon lúc đầu: 0–5 cm model 2/4, 5–10 cm 7/12,
+  ≥ 10 cm **1/10** (demo đang kẹp chỉ 2.6 cm, 50% < 2 cm). Khoảng hở nhỏ đến từ hình học đường mang lon, không phải từ cảnh. Vì vậy
+  nới `--can-gap`/`--cross-can-y` không giúp được; bước 4 của plan (mang lon qua phía trên) là đúng hướng.
+- **Tì bàn không hỏng chắc chắn:** trên `swap_hold_test` có 4 demo chạm bàn, model hỏng 3; trên `ik_test` (demo của dataset A)
+  có 9 demo chạm bàn, B-9000 vẫn làm được 7. Nhận xét "4/4 hỏng" không đúng khi tính cả `ik_test`.
+- Cùng phía: demo không sát lon kia (trung vị 8–11 cm) ở cả ca ok lẫn hỏng. Ca hỏng là do độ chính xác hoặc do không biết dừng.
+
+### 5.2l. Bước 0: mốc A/B ở chế độ fixed, 20 s + `--stop-on-success` (25/09)
+`eval/A10000_{ik,swap}_test_20s_stop` (server `/content/ckpt/g1_can_sort_ik_checkpoint-10000`, 3 và 2 lần không phản hồi),
+so với `eval/B9000_{ik,swap}_test_20s_stop`. Cùng 40 cảnh mỗi tập, chân fixed, `--workers 4`.
+
+| Tập / nhóm | n | A-10000 | B-9000 |
+|---|---|---|---|
+| `ik_test` tất cả | 40 | 30 (75%) | 31 (78%) |
+| — lon đứng | 18 | 17 | 18 |
+| — lon nằm | 22 | 13 | 13 |
+| `swap_hold_test` tất cả | 40 | 14 (35%) | 23 (58%) |
+| — cùng phía đứng | 8 | 8 | 8 |
+| — cùng phía nằm | 6 | 6 | 5 |
+| — đổi phía đứng | 4 | **0** | **0** |
+| — đổi phía nằm | 22 | **0** | 10 |
+
+- **A: lối tắt "lệnh → tay → lon cùng phía" đúng như dự đoán.** Ca đổi phía 0/26: 20 ca xô lon còn lại (tay đi về lon nằm bên
+  mình), khép tay trung bình 6.8 lần mỗi episode. Ca cùng phía 14/14.
+- Trên `ik_test` A và B ngang nhau (30 và 31) nhưng hỏng ở các episode khác nhau: cả hai ok 26, chỉ A 4, chỉ B 5, cả hai hỏng 5.
+  Học thêm ca đổi phía không làm B kém đi ở ca cùng phía.
+- Lon đứng đổi phía: cả A và B đều 0/4. Với B, demo nhóm này cách lon kia chỉ 0.4 cm trước khi kẹp (mục 5.2k).
+- **Hướng lệch lúc khép tay** (trường mới `offset_at_close_cm`, A trên `ik_test`, trừ đi độ lệch của chính demo cùng cảnh,
+  khung pelvis): model khép tay **thiếu tầm 1–3 cm theo x** (Coca nằm −3.1, Coca đứng −2.2, Pepsi đứng −1.3, Pepsi nằm −1.1 cm)
+  và lệch ra phía ngoài 0.4–1.8 cm theo y. Độ lệch có hướng cố định, không phải nhiễu.
+  - Không do thân ngả khác demo: pitch max lúc eval 7.1° so với demo 7.1°, tương quan giữa độ thiếu tầm và chênh pitch là 0.03
+    (38 ep).
+  - Giả thuyết còn lại: model khép tay **sớm** khi tay vẫn đang tiến vào lon (hướng tiến là +x). Kiểm tra được bằng cách ghi
+    khoảng cách tay–lon vài bước sau lúc khép, hoặc xem video.
+
+### 5.2m. Bước 1: `collect_demos.py --lower-body` và ghi chỉ số chất lượng lúc thu (25/09)
+- `collect_demos.py`:
+  - `--lower-body {fixed,balance}` (mặc định `fixed`), ghi `"lower_body"` vào `cfg`.
+  - `setup_episode` lấy chế độ chân từ `cfg.get("lower_body", "fixed")`; `pipeline_kwargs` ghi đè được.
+  - `run_episode` và `replay_actions` bước sim qua `pipe._lower_body(pipe.wbc.track_joint_targets(target))`.
+  - Mỗi episode có `EpisodeMetrics` chạy cùng planner. `collection.jsonl` có thêm khoá `"quality"`. File mới
+    `meta/rejected.jsonl` ghi mọi lần thử bị bỏ (task, seed, đứng/nằm, đổi phía, lý do, chỉ số tới lúc dừng).
+  - `replay_actions(..., pipeline_kwargs=...)` để phát lại với chế độ chân khác.
+- `verify_demos.py --lower-body`, `tools/eval_closed_loop.py --lower-body`, `launch_vla_simulation.py --lower-body`: mặc định
+  `None` = theo `cfg` của episode (dataset cũ: fixed). **Đổi hành vi:** trước đây mặc định cứng là `fixed`; để eval checkpoint C
+  trên tập test cũ với balance phải truyền `--lower-body balance`. GUI lấy theo episode đầu của `--scene-dataset`.
+- Kiểm tra:
+  - `verify_pipeline.py` 5/5.
+  - `verify_demos.py datasets/g1_can_sort_swap_hold`: 400/400, lệch khớp tay TB 0.046 rad (max 0.407).
+  - Sinh thử 4 episode balance (`--swap-prob 0.5`, 10 lần thử, 1 lần bỏ vì "đặt lon không thành công" với khoảng hở lúc đang kẹp
+    −0.2 cm, tức lon đang cầm đè vào lon kia) rồi phát lại: 4/4, lệch khớp TB 0.047 rad, bằng mức của dataset fixed. Phát lại
+    với balance vẫn tất định đủ dùng.
+- **Cần xem ở bước 2:** với balance, ngả và trượt nhỏ hơn fixed (ngả 2–5°, trượt 2–5 cm), nhưng **yaw pelvis lệch 7.4–9.6°** ở
+  3/3 ca đổi phía (fixed: trung vị 1.8°). Policy thăng bằng nhận góc eo yaw thành hướng thân mong muốn, có thể xoay cả pelvis
+  thay vì chỉ xoay eo. Vượt ngưỡng 3° của bước 2.
+
+### 5.2n. Bước 2: chạy thử planner với balance, so với fixed trên cùng seed (25/09, `eval/planner_trial_bal`)
+- Công cụ mới `tools/planner_trial.py`: chạy `collect_demos.run_episode` trên seed cố định (Coca và Pepsi, seed 0–39) cho từng
+  chế độ chân, không ghi dataset. In tỉ lệ thu được theo 4 nhóm, lý do bỏ, bảng chất lượng của `demo_quality`. 160 lần thử
+  mất 6.5 phút (12 worker). `--swap-prob 0.5`, các tham số khác như dataset B.
+- `EpisodeMetrics` có thêm `final_yaw_deg`, `max_foot_yaw_deg`, `max_foot_slide_cm` (bàn chân `*_ankle_roll_link`).
+
+| Nhóm | fixed | balance |
+|---|---|---|
+| Tất cả | 54/80 (68%) | **61/80 (76%)** |
+| Cùng phía đứng | 20/20 | 20/20 |
+| Cùng phía nằm | 18/20 | 19/20 |
+| Đổi phía đứng | 7/24 (29%) | **12/24 (50%)** |
+| Đổi phía nằm | 9/16 | 10/16 |
+
+| Chỉ số (episode thu được) | fixed (54) | balance (61) |
+|---|---|---|
+| Thân dưới chạm bàn | 12 (22%) | **0** |
+| Ngả max, trung vị / max | 6.1° / 13.5° | **2.6° / 5.7°** |
+| Pelvis trượt, trung vị / max | 5.5 / 13.5 cm | **2.2 / 5.3 cm** |
+| Ngả cuối episode, trung vị | 2.9° | **0.4°** |
+| Bàn chân xoay, trung vị / max | 1.4° / 10.8° | **1.5° / 4.2°** |
+| Bàn chân trượt, max | 3.1 cm | **0.7 cm** |
+| Yaw pelvis max, ca đổi phía trung vị / max | 1.5° / 10.4° | 8.3° / 11.3° |
+| Yaw pelvis cuối, max | 5.2° | 4.0° |
+| Đổi phía: khoảng hở trước kẹp, trung vị / < 2 cm | 1.7 cm / 62% | 1.2 cm / 77% |
+| Chạm lon kia | 1 | 4 (3 ở lon đứng đổi phía) |
+
+- **Yaw pelvis lớn ở balance không phải trượt chân.** Truy vết một episode đổi phía: eo xoay +18° thì pelvis xoay −8° qua khớp
+  hip yaw (`hip_yaw_l` 5 → 12°), bàn chân xoay dưới 1.7° và dời dưới 4 mm; eo về 0 thì pelvis về −1.9°. Policy thăng bằng xoay
+  pelvis ngược chiều eo để giữ mô-men, rồi tự trả lại. Planner bù theo pose pelvis đo được nên demo vẫn nhất quán. Tiêu chí
+  "yaw < 3°" của plan đổi thành **bàn chân xoay < 3°** (trượt thật). NVIDIA không có bộ giữ hướng: muốn ra lệnh yaw rate thì
+  policy chuyển sang Walk (`|cmd| ≥ 0.05`, `g1_gear_wbc_policy.py`), nên không sửa theo hướng đó.
+- **Điều kiện đi tiếp: đạt**, với vài ngoại lệ:
+  - Tỉ lệ thu được của balance ≥ fixed ở mọi nhóm; phát lại 61/61; không chạm bàn.
+  - Ngả > 5°: 3/61 (max 5.7°). Bàn chân xoay > 3°: 3/61 (max 4.2°). Yaw pelvis cuối > 3°: 2/61.
+  - Giữ ngưỡng 5° và 3° làm bộ lọc ở bước 7, mất khoảng 8% episode, quota sẽ sinh bù.
+- **Ca đổi phía còn sát lon kia hơn** so với fixed: trước khi kẹp 77% dưới 2 cm, 3/12 ca lon đứng chạm lon kia. Bước 4 càng cần.
+- Lon đứng đổi phía: balance thu được 12/24. 11/12 lần bỏ là "tay va chạm khi tiến vào lon", đầu vào cho bước 5.
+
+### 5.2o. Bước 4: chừa khoảng hở với lon còn lại (25/09, `eval/planner_trial_step4{,b,c,d}`)
+- Đo theo đoạn (nhãn mới `PickPlacePlanner.phase`: reach/approach/close/lift/carry/lower/retreat), ca đổi phía, balance,
+  trước khi sửa: sát lon kia ở **hai** chỗ, không chỉ lúc mang lon:
+  - Vươn tay + tiến vào lon: cổ tay/ngón tay cách lon kia trung vị 1.1 cm (lon đứng). Lon đứng tiếp cận theo pháp tuyến lòng
+    bàn tay; khi gắp chéo người, điểm chờ lùi 7 cm về phía lon kia.
+  - Mang lon: lon đang cầm (lon nằm) hoặc cổ tay (lon đứng) cách lon kia trung vị 1.6–3.0 cm, vì đáy lon đang cầm (~10 cm) thấp
+    hơn đỉnh lon kia (11.8 cm), cả ở điểm trên khay.
+- Sửa `sim/pick_place_planner.py`:
+  - `APPROACH_MARGINS` (5, 4, 3, 2, 1 cm) cho vươn tay/hạ xuống/tiến vào; `CARRY_MARGINS` (6, 4, 2, 1 cm) cho mang lon. Thử từ lớn
+    tới nhỏ, nên không mất episode. Đường nhấc lon và hạ lon xuống khay vẫn 1 cm (xuất phát/kết thúc sát lon kia là do cảnh).
+  - Lon đứng có thêm 2 điểm chờ (`UPRIGHT_PRE_OFFSETS`: lùi ít theo lòng bàn tay, nhiều theo ngón tay hoặc lên cao).
+  - Lon kia nằm gần đường mang lon (`CARRY_CORRIDOR` 15 cm): nhấc lon tới khi đáy cao hơn đỉnh lon kia `CARRY_CLEARANCE` 4 cm
+    (nhấc 14–16 cm thay vì 10), điểm trên khay ở cùng độ cao. Số bước nhấc và hạ tăng theo quãng đường.
+  - Khoảng hở > 1 cm đo bằng `mj_geomDistance` (`_too_close`). **`geom_margin` với mesh bàn tay chỉ đúng một phần:** lập với
+    margin 5 cm, khoảng cách thật trên kế hoạch chỉ 3.2 cm, và kết quả chạy không đổi so với margin 3 cm.
+  - Lon nằm: ở các mức khoảng hở > 1 cm chỉ xét 2 pose gắp đầu. Xét cả pose xếp sau thì "gắp trượt" tăng (lon nằm đổi phía thu
+    được 12 → 9).
+  - `planner.info` và `plan` trong kết quả `run_episode` / `collection.jsonl` ghi mức khoảng hở đã chọn, điểm chờ, độ cao nhấc,
+    điểm trên khay.
+- **Tay chạy thật lệch khỏi kế hoạch 2–3 cm** (khớp tay bám chậm theo PD giữa đoạn vươn tay, cổ tay lệch xuống ~2 cm), ở cả fixed
+  lẫn balance. Kế hoạch 3 cm thì lúc chạy còn trung vị 1.5 cm. Vì vậy mức đầu của các bậc lớn hơn khoảng hở mong muốn.
+- Kết quả, balance, 80 seed (40 mỗi lon, `--swap-prob 0.5`), ca đổi phía:
+
+  | | Trước bước 4 | Sau (`step4d`) |
+  |---|---|---|
+  | Thu được, đổi phía | 22/40 | **31/40** (đứng 20/24, nằm 11/16) |
+  | Thu được, tất cả | 61/80 | **70/80** |
+  | Trước khi kẹp: trung vị / < 2 cm | 1.2 cm / 77% | **2.9 cm / 39%** |
+  | Đang kẹp: trung vị / < 2 cm | 2.1 cm / 41% | **5.1 cm / 10%** |
+  | Đoạn mang lon, lon đứng: < 2 cm | 25% | **0%** |
+  | Chạm lon kia | 3 | 2 |
+
+  Ca cùng phía giữ nguyên (khoảng hở ≥ 7 cm, không ca nào < 2 cm).
+- Chưa đạt ngưỡng plan (sau kẹp < 2 cm dưới 5%, trước kẹp dưới 15%). Phần còn lại:
+  - Đoạn tiến vào lon đứng (30% < 2 cm): tay bám chậm, và 4/20 ca phải hạ xuống mức 2 cm mới lập được.
+  - Đoạn nhấc lon ngay sau khi kẹp: sát lon kia khi hai lon đặt gần nhau (hở 3.2 cm).
+  - **Đề xuất lọc ở bước 7:** bỏ episode có min(trước kẹp, đang kẹp) < 1 cm hoặc chạm lon kia: mất 7/31 ca đổi phía (23%). Sau
+    lọc, tỉ lệ thu được ở ca đổi phía còn khoảng 24/40, vẫn cao hơn trước bước 4 (22/40, chưa lọc).
+- `verify_pipeline.py` 5/5.
+- **Bộ lọc chất lượng đưa vào lúc thu** (thay cho lọc riêng ở bước 7): `collect_demos.py --quality-filter` (mặc định bật, ghi
+  `"quality_filter"` vào `cfg`). `run_episode` gọi `EpisodeMetrics.violation()` sau mỗi bước và dừng sớm, lý do
+  `"chất lượng: ..."` vào `rejected.jsonl`. Ngưỡng ở đầu `sim/episode_metrics.py`:
+  - chạm lon còn lại, hoặc khoảng hở < 1 cm (`MIN_OTHER_CLEAR`), trước khi kẹp / đang kẹp;
+  - chỉ với chân balance: thân dưới chạm bàn, ngả > 5°, bàn chân xoay > 3°.
+- Planner: `LYING_CLEAR_GRASPS = 4` (lon nằm, số pose gắp xét ở mức khoảng hở > 1 cm). So với 2 thì sát lon ít hơn (5 → 2 ca)
+  nhưng ngả > 5° nhiều hơn (0 → 3); giữ 4.
+- Chạy thử có lọc (`eval/planner_trial_filter4`, balance, 80 seed): thu được **59/80** (cùng phía đứng 19/20, cùng phía nằm
+  17/20, đổi phía đứng 16/24, **đổi phía nằm 7/16**). Mọi episode giữ lại: không chạm lon kia, không chạm bàn, đang kẹp không ca
+  nào < 2 cm (trung vị đổi phía 5.8 cm), trước kẹp đổi phía < 2 cm 22% (trung vị 3.8 cm), ngả max 4.3°.
+  - Lon nằm đổi phía giờ là nhóm khó thu nhất (44%): quota ở bước 7 phải thử khoảng 2.3 lần; cần xem vùng phủ ở bước 5.
+
+### 5.2p. Bước 3: kiểu gắp lon nằm theo quy tắc cố định (25/09, `eval/planner_trial_modes_{cost,rule}`)
+- Quét 300 cảnh lon nằm (`plan_grasps`, không chạy sim): hai kiểu gắp = hai chiều trục cuộn ngón dọc trục lon (`finger_axis`,
+  góc φ trong world). Với góc tham chiếu ψ, kiểu ưu tiên là kiểu có cos(φ − ψ) > 0. Quét ψ theo từng tay:
+  - Tay phải (Coca) ψ = 125°: chi phí tăng TB 0.06 (cùng phía) / 0.33 (đổi phía), 2 + 2 cảnh không có kiểu ưu tiên.
+  - Tay trái (Pepsi) ψ = 215°: tăng 0.15 / 0.20, 0 + 1 cảnh. Pepsi vốn gần như theo quy tắc; Coca chọn lẫn lộn trong φ 0–225°.
+- `sim/pick_place_planner.py`: `LYING_MODE_REF_DEG = {"right": 125, "left": 215}`. Pose gắp chia hai nhóm theo kiểu, nhóm ưu
+  tiên thử trước (với mọi mức khoảng hở và điểm chờ), nhóm kia chỉ khi nhóm ưu tiên không lập được. `plan_grasps` trả thêm
+  `finger_axis`, `cost`. `planner.info`/`plan` ghi `wrist_pitch`, `finger_axis_deg`, `mode_fallback`.
+- Công cụ: `tools/grasp_modes.py` (bảng kiểu gắp theo tay × cùng/đổi phía × yaw 20°, số lần đổi kiểu khi xếp theo yaw; dataset
+  cũ thì xấp xỉ bằng wrist pitch ở khung 55), `tools/planner_trial.py --lying-mode {rule,cost}` và `--lying-prob`.
+- So sánh 300 cảnh lon nằm (seed 1000–1149 mỗi lon, `--swap-prob 0.5 --lying-prob 1.0`, balance, có lọc):
+
+  | | Theo chi phí | Theo quy tắc |
+  |---|---|---|
+  | Thu được | 190/300 (63%) | 174/300 (58%) |
+  | — cùng phía / đổi phía | 115/154 / 75/146 | 108/154 / 66/146 |
+  | Ô yaw 20° có ≥ 90% cùng kiểu | 25/33 | **28/33** |
+  | Số lần đổi kiểu theo yaw: Coca cùng / Coca đổi / Pepsi cùng / Pepsi đổi | 6 / 8 / 14 / 4 | **2 / 6 / 6 / 4** |
+  | Dùng kiểu còn lại (`mode_fallback`) | – | 5 |
+
+  - "Đổi kiểu" tính cả chỗ nối 180° ≡ 0° (định nghĩa kiểu "+" đảo dấu ở đó), nên 2 là mức tối thiểu: một ranh giới thật.
+  - Coca cùng phía (nhóm hỏng ở closed-loop B, mục 5.2g) giờ chỉ đổi kiểu một lần ở yaw ~40°; vùng 90–120° hết lẫn.
+  - Ô còn lẫn: ranh giới của Pepsi cùng phía (120–140°, do góc tham chiếu 215°) và các ca `mode_fallback`.
+- Tỉ lệ thu được giảm 5.3 điểm (ngưỡng plan 5): kiểu ưu tiên lập được nhưng lúc chạy hỏng nhiều hơn (gắp trượt, sát lon kia,
+  ngả > 5°), chủ yếu ở đổi phía yaw 30–90°. **Giữ quy tắc**: lỗi đổi kiểu giữa chừng đã làm hỏng closed-loop thật, còn số
+  lượng thì quota bù được. Vùng thiếu dữ liệu xử lý ở bước 5.
+- **Ngưỡng bàn chân xoay nâng 3° → 5°** (`MAX_FOOT_YAW_DEG`): với balance, p90 = 3.0°, lúc không lọc max 4.2°. Ngưỡng 3° loại
+  21–28/300 episode lon nằm bình thường. Trượt chân thật ở chân fixed tới 10.8°.
+
+### 5.2q. Bước 5: vùng phủ ca đổi phía (25/09, `eval/planner_trial_{swaplying,swaplying2,swapup,swapup4,step5b}`)
+- Công cụ `tools/trial_coverage.py TRIAL [--swapped|--same-side]`: tỉ lệ thu được theo x, |y|, khoảng hở hai lon, yaw lon nằm;
+  lý do loại; ảnh `coverage.png` (vị trí thu được / bị loại, histogram yaw).
+- **Lon nằm đổi phía, yaw 30–120° gần như bị loại hết** (3/20 ở 90–120°):
+  - Coca: phần lớn do ngưỡng bàn chân xoay 3° (đã nâng lên 5°, mục 5.2p).
+  - Pepsi và Coca còn lại: "gắp trượt", bàn tay khép cách tâm lon 5–7 cm, lon gần như không dời (< 1.3 cm). Nguyên nhân: servo đoạn
+    tiến vào lon giữ nguyên góc eo, pelvis xoay ngược chiều eo ~9° (balance), tay vươn chéo người gần giới hạn không bù nổi; IK
+    không tới ở cả 10 bước cuối (ca thành công: 0/10) nên quay về tư thế đã lập, bàn tay lệch ~5 cm.
+  - Sửa `_servo`: khi chỉ khớp tay không tới, giải lại cho **waist_yaw** tham gia (waist_pitch vẫn giữ). 120 cảnh lon nằm đổi
+    phía: 71 → **92/120**, gắp trượt 24 → 4, yaw 60–90° 10/21 → 18/21, 90–120° 7/15 → 14/15. Yaw pelvis lúc gắp chéo tăng (trung
+    vị 8.3 → 11.1°), vẫn tự trở lại (yaw cuối ≤ 3.9°), bàn chân xoay max 4.2°.
+- **Lon đứng đổi phía, hai lon cách nhau 5–10 cm: 0/50** (≥ 15 cm: 35/42), tổng 47/120. Gắp lon đứng là bàn tay dựng đứng, lòng
+  bàn tay hướng vào lon; gắp chéo người thì bàn tay chen giữa hai lon và mọi điểm chờ đều lùi ngang về phía lon còn lại.
+  - Thử pose bàn tay lật ngược (lòng bàn tay quay sang phía kia): IK tới được tư thế gắp nhưng không episode nào dùng được
+    (điểm chờ lùi ra ngoài tầm với). Đã bỏ.
+  - Thêm 3 điểm chờ không lùi ngang vào `UPRIGHT_PRE_OFFSETS`: hạ thẳng từ trên (0, 0, 9 cm), tiến dọc ngón tay (0, 8, 2 cm),
+    kết hợp (1.5, 5, 5 cm). 120 cảnh: 47 → **84/120**, hai lon cách 5–10 cm 0/50 → 24/50, |y| < 7 cm 9/58 → 30/58. 59/84 episode
+    thu được dùng điểm chờ hạ thẳng từ trên. Lon đứng cùng phía vẫn dùng điểm chờ cũ (19/19).
+- Kiểm tra lại 80 seed trộn (`eval/planner_trial_step5b`, balance, có lọc): **68/80** (trước bước 5: 59/80).
+
+  | Nhóm | Trước bước 4 (không lọc) | Sau bước 4 + lọc | Sau bước 3 + 5 |
+  |---|---|---|---|
+  | Cùng phía đứng | 20/20 | 19/20 | 19/20 |
+  | Cùng phía nằm | 19/20 | 17/20 | 17/20 |
+  | Đổi phía đứng | 12/24 | 16/24 | **19/24** |
+  | Đổi phía nằm | 10/16 | 7/16 | **13/16** |
+
+  Phát lại 68/68; không chạm lon kia, không chạm bàn; đang kẹp ≥ 1 cm (đổi phía < 2 cm: 6%); ngả max 4.8°.
+- Còn lại: hai lon cách nhau < 10 cm ở lon đứng đổi phía vẫn chỉ thu được khoảng một nửa (loại vì sát lon kia < 1 cm lúc chạy).
+- `verify_pipeline.py` 5/5.
+
+### 5.2r. Bước 6: episode "đã xong" (25/09)
+- `collect_demos.py --done-prob P` (ghi `done_prob` vào `cfg`): với xác suất P, lon nhiệm vụ nằm sẵn trong khay đích (lệch tâm
+  khay ≤ 3 cm, giữ đứng/nằm và hướng đã lấy mẫu), robot về tư thế ready từ tư thế tay có nhiễu rồi đứng yên `DONE_SECONDS` = 4 s
+  (100 khung). Mục đích: model thấy lon đã trong khay thì không gắp lại (lỗi 2/3 ca cùng phía hỏng của B, mục 5.2g).
+- `sample_randomization` bốc cờ `done` bằng bộ sinh số riêng `default_rng([seed, 7])` sau mọi số ngẫu nhiên khác, nên cảnh của
+  dataset cũ và của episode thường không đổi. `apply_randomization` đặt lon vào khay khi `done`, nên phát lại, eval và GUI
+  (`--scene-dataset`) dựng đúng cảnh. `collection.jsonl` có khoá `"done"`.
+- Kiểm tra: sinh 6 episode `--done-prob 1.0` (balance): phát lại 6/6, lệch khớp 0; ảnh khung đầu/cuối đúng (lon trong khay).
+
+### 5.2s. Bước 7: quota theo nhóm và sinh dataset C (25/09)
+- `collect_demos.py --group-quota N [--done-per-task K --done-prob P]`: mỗi lon N episode cho từng nhóm (`GROUPS`: cùng/đổi
+  phía × đứng/nằm) cộng K episode "đã xong". Nhóm của seed tính trước bằng `scene_group()` (từ `sample_randomization`), nên chỉ
+  chạy seed thuộc nhóm còn thiếu; số lần thử mỗi đợt ước theo tỉ lệ thu được của từng nhóm. Không có `--group-quota` thì chạy
+  như cũ (`--episodes-per-task`). Thống kê cuối in theo (lon, nhóm).
+- Thử `--group-quota 2 --done-per-task 1`: 18 episode, 46 lần thử, 107 s (12 worker), phát lại 18/18.
+- Lệnh sinh (log `eval/collect_bal.log`, `eval/collect_bal_test.log`):
+  ```bash
+  collect_demos.py --out datasets/g1_can_sort_bal --group-quota 50 --done-per-task 20 --done-prob 0.1 \
+      --swap-prob 0.5 --lying-prob 0.5 --lower-body balance --seed 0 --workers 12          # 440 episode
+  collect_demos.py --out datasets/g1_can_sort_bal_test --group-quota 5 --done-per-task 2 --done-prob 0.1 \
+      --swap-prob 0.5 --lying-prob 0.5 --lower-body balance --seed 100000 --workers 12     # 44 episode
+  ```
+  Mặc định đã bật `--quality-filter`, `--hold-seconds 2.5`.
+- Đợt đầu giả định tỉ lệ thu được 0.5 nên chạy 1 110 lần thử cho 440 episode (41 phút); đã sửa giả định thành 0.7.
+- **`g1_can_sort_bal`: 440 episode, 99 343 khung**, 224 đứng / 216 nằm, 214 đổi phía, 40 "đã xong". Zip 434 MB.
+  **`g1_can_sort_bal_test`: 44 episode, 9 953 khung** (4 "đã xong"). Zip 43 MB.
+  - Tỉ lệ thu được (111 lần thử mỗi nhóm): cùng phía đứng 107 / 107, cùng phía nằm 87 / 92, đổi phía nằm 94 / 90, đổi phía đứng
+    **72 / 77** (Coca / Pepsi). Đổi phía đứng bị loại vì sát lon kia (38) và không với tới tư thế gắp (32).
+  - Phát lại 440/440 và 44/44 (lệch khớp TB 0.036 / 0.033 rad).
+  - `demo_quality`: không chạm lon kia, không chạm bàn; ngả max 4.9°; ngả cuối trung vị 0.4°; bàn chân xoay max 4.7°. Đổi phía:
+    trước kẹp trung vị 3.8 cm (13% < 2 cm), đang kẹp 5.1 cm (6% < 2 cm). Cùng phía ≥ 8.5 cm.
+  - `grasp_modes` (bỏ episode "đã xong"): cả 4 nhóm lon nằm đổi kiểu đúng 2 lần (một ranh giới + chỗ nối 180° ≡ 0°); ô đạt 33/36,
+    ô chưa đạt là ô chứa ranh giới.
+  - Vùng phủ đổi phía (`datasets/g1_can_sort_bal_swap_coverage.png`, tính cả lần bị loại): lon đứng khi hai lon cách < 5 cm chỉ
+    1/27 (khoảng 2% mọi cảnh), 5–10 cm 19/49; lon ở xa (x > 0.33 hoặc |y| > 0.11) thu được 40–50%. Các vùng khác ≥ 70%.
+  - Ảnh vị trí lon: `datasets/g1_can_sort_bal_can_positions.png`.
+- Train C: batch 64 và đi qua dữ liệu khoảng 8.5 lần như B, nên **`MAX_STEPS` ≈ 8.5 × 99 343 / 64 ≈ 13 200** (B: 12 500).
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel
@@ -879,6 +1193,16 @@ Mục tiêu: gắp được lon **sâu hơn** trên bàn và **rộng hơn** d�
 
 ## 7. Việc tiếp theo
 
+- **25/09: plan sinh lại dữ liệu với balance (checkpoint C), đã duyệt; bước 0 (5.2l), 0b (5.2k), 1 (5.2m), 2 (5.2n, đạt), 3 (5.2p), 4 (5.2o), 5 (5.2q), 6 (5.2r), 7 (5.2s) xong, tiếp theo bước 8 (train C trên Colab):** [`docs/PLAN_BALANCE_DATASET.md`](docs/PLAN_BALANCE_DATASET.md).
+  Gồm: eval A với cấu hình 20 s + stop; kiểm chứng số liệu nhận xét bằng `tools/demo_quality.py` (0b); `collect_demos
+  --lower-body` kèm chỉ số chất lượng và lý do bỏ; chạy thử planner (điều kiện: không chạm bàn, ngả < 5°, yaw < 3°); kiểu gắp
+  lon nằm nhất quán; mang lon qua **phía trên** lon kia (`CARRY_CLEARANCE` ≈ 4 cm, không tăng `OTHER_CAN_MARGIN` lên 4 cm);
+  đủ dữ liệu lon đứng đổi phía; episode "đã xong" (tuỳ chọn); quota 50/nhóm/lon (đứng/nằm × cùng/đổi phía) và lọc demo chạm
+  bàn; train C, so trên cùng cảnh test với A/B, tách theo nhóm.
+  - Nhận xét 25/09 về dữ liệu B (chưa kiểm chứng): demo đổi phía cách lon kia trung vị 1.4 cm trước và 1.8 cm sau khi kẹp
+    (`LIFT_HEIGHT` 0.10 để đáy lon đang cầm thấp hơn đỉnh lon kia); 49/400 demo hông tì bàn (đều lon nằm); yaw thân lệch tới
+    12.6° ở ca đổi phía; state không có tư thế pelvis. Đưa độ ngả vào state để sau khi có kết quả C.
+
 0. **Thu hồi HF token `hf_JbmJ...`** trên HuggingFace (mục 2, Bảo mật).
 1. ~~Chạy Bước 11 pilot~~; ~~chạy closed-loop pilot~~ (mục 5.1); ~~sinh, verify, vẽ, nén dataset IK~~ (mục 4.4);
    ~~tham số hoá notebook~~; ~~công cụ đánh giá closed-loop~~ (mục 5.2).
@@ -955,6 +1279,7 @@ systemd-inhibit --what=sleep:idle --who=me --why="collect" <lệnh>
 | `sim/pick_place_planner.py` | quỹ đạo gắp-đặt IK online (generator 50 Hz, lập kế hoạch theo trạng thái sim, gắp chéo người khi lon đổi phía) |
 | `tools/build_colab_notebooks.py`, `tools/plot_can_positions.py` | sinh notebook (tham số `DATASET_NAME`), vẽ vị trí/hướng lon |
 | `tools/eval_closed_loop.py` | đánh giá closed-loop headless theo seed, chấm như lúc thu demo |
+| `tools/demo_quality.py`, `sim/episode_metrics.py` | phát lại dataset, đo khoảng hở tới lon kia, thân ngả/trượt/chạm bàn |
 | `checkpoints/GEAR-SONIC/` | encoder/decoder SONIC (3 biến thể), `planner_sonic.onnx`, `README.md` |
 
 ### Dataset và checkpoint
