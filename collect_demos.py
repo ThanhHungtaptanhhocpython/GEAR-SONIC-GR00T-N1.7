@@ -203,8 +203,8 @@ def apply_randomization(pipe, task: str, rand: dict) -> dict:
             "other_start": d.qpos[can_adr[other]:can_adr[other] + 3].copy()}
 
 
-def is_success(pipe, ctx) -> bool:
-    """Lon nằm trong đúng khay, đã nhả, và lon còn lại không bị xô lệch quá 3 cm."""
+def is_success(pipe, ctx, check_other: bool = True) -> bool:
+    """Lon nằm trong đúng khay, đã nhả, và lon còn lại không bị xô lệch quá 3 cm (check_other=False: bỏ điều kiện cuối)."""
     d = pipe.sim.data
     can_adr, can, other = ctx["can_adr"], ctx["can"], ctx["other"]
     can_pos = d.qpos[can_adr[can]:can_adr[can] + 3]
@@ -213,7 +213,7 @@ def is_success(pipe, ctx) -> bool:
         np.all(np.abs(can_pos[:2] - tray_pos[:2]) < 0.08)
         and can_pos[2] < tray_pos[2] + 0.1
         and not pipe.sim.is_grasped(can)
-        and np.linalg.norm(d.qpos[can_adr[other]:can_adr[other] + 3] - ctx["other_start"]) < 0.03
+        and (not check_other or np.linalg.norm(d.qpos[can_adr[other]:can_adr[other] + 3] - ctx["other_start"]) < 0.03)
     )
 
 

@@ -772,6 +772,22 @@ Coca nằm 6/10, Pepsi nằm 5/6. Mẫu còn nhỏ, nhưng Coca nằm là nhóm 
   - Server cố định seed noise, để hai lần gọi liên tiếp với quan sát gần nhau cho ra cùng một kiểu gắp.
   - Sửa planner cho kiểu gắp lon nằm nhất quán theo yaw, và phủ dày dữ liệu cùng phía quanh ranh giới đổi kiểu.
 
+### 5.2h. Closed-loop B-9000 trên tập đổi phía, 20 s + `--stop-on-success` (25/09, `eval/B9000_swap_test_20s_stop`, đang chạy)
+- 7 episode đầu: 4 thành công. Hỏng: 100046 (Pepsi) và 100002 (Coca) làm lon rơi khỏi bàn; 100001 (Coca) xô lon còn lại.
+- **coke 100001** (Coca nằm, đổi phía, hai lon sát nhau ở giữa bàn):
+  - Tay phải vươn chéo người, kẹp rất chuẩn (cách lon 0.75 cm lúc 2.4 s) và đặt đúng vào khay đỏ.
+  - Nhưng lúc 0.7–3.7 s cánh tay đè qua lon Pepsi đang nằm, đẩy nó lăn. Lon Pepsi lệch tổng cộng 30.3 cm.
+  - `is_success` yêu cầu lon còn lại lệch dưới 3 cm (demo nào xô lon đều đã bị loại), nên tính là hỏng. Bản cũ ghi nhầm lý do
+    là "kẹp được nhưng rơi hoặc đặt sai chỗ".
+  - Với `--stop-on-success`, episode chạy hết 20 s vì điều kiện thành công không bao giờ đúng.
+- **Sửa công cụ:**
+  - `collect_demos.is_success(..., check_other=False)` bỏ điều kiện lon còn lại; mặc định không đổi.
+  - `eval_closed_loop` ghi thêm `in_tray` (lon nhiệm vụ nằm trong khay, đã nhả, lúc kết thúc), và có lý do hỏng mới "đặt
+    đúng khay nhưng xô lon còn lại".
+  - Đã thử `is_success` / `in_tray` bằng cách đặt lon tay vào khay. Chỉ áp dụng cho các lượt chạy sau.
+- Xô lon còn lại là điểm khó riêng của ca đổi phía: tay đi chéo sát lon kia. Planner chỉ chừa được khoảng 1 cm (mục 4.5), nên
+  model lệch khoảng 1 cm là đủ đụng lon.
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel

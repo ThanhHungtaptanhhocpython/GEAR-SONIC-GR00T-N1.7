@@ -56,6 +56,8 @@ def failure_reason(r: dict) -> str:
         return "server không phản hồi"
     if r.get("can_fell"):
         return "lon rơi khỏi bàn"
+    if r.get("in_tray") and r["other_moved_cm"] >= 3.0:
+        return "đặt đúng khay nhưng xô lon còn lại"
     if r["other_moved_cm"] >= 3.0 and not r["grasped"]:
         return "xô lon còn lại"
     if not r["grasped"]:
@@ -144,6 +146,7 @@ def run_episode(job) -> dict:
     r = {
         "task": task, "seed": seed, "lying": bool(lying), "swapped": bool(swapped),
         "ok": cd.is_success(pipe, ctx), "ok_any": t_success is not None, "t_success": t_success,
+        "in_tray": cd.is_success(pipe, ctx, check_other=False),
         "grasped": t_grasp is not None, "t_grasp": t_grasp,
         "dist_at_close_cm": None if d_close is None else round(d_close * 100, 2),
         "can_start": can_start.round(3).tolist(), "can_final": d.qpos[can_adr:can_adr + 3].round(3).tolist(),

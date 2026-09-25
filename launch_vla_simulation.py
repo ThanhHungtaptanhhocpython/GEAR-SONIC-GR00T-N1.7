@@ -244,7 +244,7 @@ def main():
                         help="fixed: chân khoá cứng như lúc thu demo (mặc định); balance: policy thăng bằng của NVIDIA "
                              "GR00T-WholeBodyControl điều khiển chân + eo (bridge/lower_body_policy.py)")
     parser.add_argument("--stop-on-success", action=argparse.BooleanOptionalAction, default=True,
-                        help="Đặt xong lon thì ngừng gọi model, giữ tư thế ready tới khi bấm R/N/1/2 (mặc định bật)")
+                        help="Đặt xong lon thì ngừng gọi model, giữ tư thế ready tới khi bấm F10/F11/F8/F9 (mặc định bật)")
     args = parser.parse_args()
 
     # Tự động mở SSH tunnel nếu có --ssh-tunnel
