@@ -180,11 +180,11 @@ khi làm các bước sau.
 - Nén zip rồi tải lên `MyDrive/gr00t/`.
 - Tính trước số bước train theo số khung, như mục 5.2d-bis: muốn đi qua dữ liệu khoảng 8.5 lần thì số mẫu ≈ 8.5 × số khung.
 - **Đã làm (memo mục 5.2s):** `--group-quota 50 --done-per-task 20` (440 episode, 99 343 khung) và tập test 44 episode; phát lại
-  100%; zip 434 MB / 43 MB; `MAX_STEPS` ≈ 13 200.
+  100%; zip 434 MB / 43 MB; train như B: batch 80, `MAX_STEPS` ≈ 10 700 (memo mục 5.2s).
 
 ## Bước 8: Fine-tune và đánh giá checkpoint C
 
-- Train từ base `nvidia/GR00T-N1.7-3B`, cùng cấu hình như B (batch 64, LR 1e-4, tag `NEW_EMBODIMENT`). Chỉ đổi dataset và
+- Train từ base `nvidia/GR00T-N1.7-3B`, cùng cấu hình như B (batch 80, LR 1e-4, tag `NEW_EMBODIMENT`). Chỉ đổi dataset và
   `MAX_STEPS`.
 - Open-loop (Bước 11 của notebook) trên `g1_can_sort_bal_test`, mỗi 1000 bước từ 5000 trở đi. Chọn checkpoint có MAE test thấp
   nhất.

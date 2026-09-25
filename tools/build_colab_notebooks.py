@@ -334,7 +334,7 @@ Fine-tune `nvidia/GR00T-N1.7-3B` trên dataset demo sim do `collect_demos.py` t�
 ### Yêu cầu
 * **GPU A100.** Fine-tune mặc định (projector + action head, không tune backbone) cần khoảng 35 GB VRAM. Nếu hết bộ nhớ, giảm `GLOBAL_BATCH_SIZE` ở Bước 4.
 * **HuggingFace:** quyền truy cập repo gated `nvidia/Cosmos-Reason2-2B`, token trong **Colab Secrets** tên `HF_TOKEN`.
-* **Google Drive:** file dataset nén `.zip` trong `MyDrive/gr00t/` (mặc định `g1_can_sort_ik.zip`, đổi bằng `DATASET_NAME` ở Bước 4). Checkpoint cuối được chép về `MyDrive/gr00t/checkpoints/<DATASET_NAME>/`, cần khoảng 10–15 GB trống.
+* **Google Drive:** file dataset nén `.zip` trong `MyDrive/gr00t/` (mặc định `g1_can_sort_bal.zip`, đổi bằng `DATASET_NAME` ở Bước 4). Bước 8a chép mọi checkpoint từ bước `SYNC_FROM_STEP` về `MyDrive/gr00t/checkpoints/<DATASET_NAME>/`, mỗi checkpoint khoảng 10–15 GB: cần đủ chỗ cho tất cả (ví dụ 5000 → 10700 với `SAVE_STEPS` 1000 là 7 checkpoint).
 
 ### Tạo file zip ở máy local
 ```bash
@@ -344,7 +344,7 @@ rồi tải `datasets/g1_can_sort_ik.zip` lên thư mục `gr00t` trong Google D
 Để đánh giá tổng quát hoá (Bước 11), tải thêm tập test `datasets/g1_can_sort_ik_test.zip` (tạo bằng `collect_demos.py --out datasets/g1_can_sort_ik_test --episodes-per-task 20 --seed 100000`, tên đặt ở `TEST_DATASET_NAME`) vào cùng thư mục.
 
 ### Lưu ý
-* Checkpoint trong lúc train lưu ở ổ đĩa tạm `/content/outputs`. Nếu runtime bị ngắt giữa chừng thì mất, nên Bước 10 chép checkpoint cuối về Drive.
+* Checkpoint trong lúc train lưu ở ổ đĩa tạm `/content/outputs`, và `finetune.sh` chỉ giữ 5 checkpoint gần nhất (`--save_total_limit 5`). Bước 8a chép từng checkpoint về Drive ngay khi ghi xong, nên không mất khi runtime bị ngắt hoặc khi checkpoint cũ bị xoá. Bước 11 đánh giá mọi checkpoint và chỉ ra checkpoint tốt nhất.
 * Isaac-GR00T được ghim ở commit `{ISAAC_COMMIT[:7]}`.
 """),
         GPU_CELL,
@@ -359,8 +359,8 @@ drive.mount("/content/drive")
 DRIVE_DIR = "/content/drive/MyDrive/gr00t"
 # Tên dataset = tên file zip trên Drive (không có .zip) = tên thư mục bên trong zip.
 # Checkpoint lưu theo tên này: MyDrive/gr00t/checkpoints/<DATASET_NAME>/checkpoint-*
-DATASET_NAME = "g1_can_sort_ik"            # dataset cũ: "g1_can_sort_pilot"
-TEST_DATASET_NAME = "g1_can_sort_ik_test"  # tập test cho Bước 11; dataset cũ: "g1_can_sort_test"
+DATASET_NAME = "g1_can_sort_bal"            # checkpoint C; A: "g1_can_sort_ik", B: "g1_can_sort_swap_hold"
+TEST_DATASET_NAME = "g1_can_sort_bal_test"  # tập test cho Bước 11
 os.environ.update({
     "DATASET_ZIP": f"{DRIVE_DIR}/{DATASET_NAME}.zip",
     "DATASET_DIR": f"/content/datasets/{DATASET_NAME}",
@@ -372,9 +372,13 @@ os.environ.update({
     "DRIVE_CKPT_DIR": f"{DRIVE_DIR}/checkpoints",
     # Tham số train (đọc bởi examples/finetune.sh)
     "NUM_GPUS": "1",
-    "MAX_STEPS": "5000",
+    # C: batch 80 và ~8.6 lần đi qua 99 343 khung như B (80 × 10 000 trên 93 200 khung); GPU 40 GB thì batch 32
+    "MAX_STEPS": "10700",
     "SAVE_STEPS": "1000",
-    "GLOBAL_BATCH_SIZE": "32",   # hết VRAM thì giảm xuống 16
+    "GLOBAL_BATCH_SIZE": "80",
+    # Bước 8a chép checkpoint từ bước này về Drive; Bước 11 đánh giá checkpoint từ bước này
+    "SYNC_FROM_STEP": "5000",
+    "EVAL_FROM_STEP": "5000",
     "DATALOADER_NUM_WORKERS": "4",
     "USE_WANDB": "0",
 })
@@ -478,7 +482,77 @@ cd /content/Isaac-GR00T && source .venv/bin/activate && bash examples/finetune.s
 \"\"\"
 train_proc = subprocess.Popen(["bash", "-c", train_cmd], env={**os.environ, "PYTHONUNBUFFERED": "1"},
                               start_new_session=True)
-print(f"Đã khởi động train (PID {train_proc.pid}). Log: {TRAIN_LOG}. Chạy Bước 8b để xem tiến độ.")
+print(f"Đã khởi động train (PID {train_proc.pid}). Log: {TRAIN_LOG}. Chạy ngay Bước 8a (chép checkpoint về Drive), "
+      "rồi Bước 8b để xem tiến độ.")
+"""),
+        code("""
+# [BƯỚC 8a] Chép từng checkpoint về Drive ngay khi ghi xong (luồng chạy nền, kiểm tra mỗi phút). Chạy ngay sau Bước 8,
+# trước Bước 8c (Bước 8c chờ tới khi train xong).
+# finetune.sh chỉ giữ 5 checkpoint gần nhất và ổ /content mất khi runtime bị ngắt, nên không chép thì checkpoint giữa
+# chừng (để chọn checkpoint tốt nhất ở Bước 11) sẽ mất. Chép vào thư mục tạm "_partial_checkpoint-N" rồi đổi tên, nên
+# thư mục "checkpoint-N" trên Drive luôn đầy đủ. Luồng tự dừng sau lần chép cuối khi train xong; runtime khởi động lại
+# thì chạy lại cell này để chép nốt.
+import glob, os, re, shutil, threading, time
+
+SYNC_FROM_STEP = int(os.environ["SYNC_FROM_STEP"])
+SRC = f"{os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}"
+DST = f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}"
+step_of = lambda p: int(re.search(r"checkpoint-(\\d+)$", p).group(1))
+
+def dir_size(path):
+    return sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(path) for f in fs)
+
+def ready(path):
+    # Trainer ghi trainer_state.json sau cùng; đợi thêm 60 s không có file nào thay đổi
+    files = [os.path.join(r, f) for r, _, fs in os.walk(path) for f in fs]
+    return (os.path.exists(f"{path}/trainer_state.json")
+            and time.time() - max(os.path.getmtime(f) for f in files) > 60)
+
+def sync_once(log):
+    os.makedirs(DST, exist_ok=True)
+    for src in sorted(glob.glob(f"{SRC}/checkpoint-*"), key=step_of):
+        step = step_of(src)
+        dest = f"{DST}/checkpoint-{step}"
+        if step < SYNC_FROM_STEP or os.path.isdir(dest) or not ready(src):
+            continue
+        size = dir_size(src)
+        free = shutil.disk_usage(DST).free
+        if free < size * 1.1:
+            log(f"⚠️ Drive còn {free / 1e9:.1f} GB, không đủ chép checkpoint-{step} ({size / 1e9:.1f} GB)")
+            continue
+        tmp = f"{DST}/_partial_checkpoint-{step}"
+        shutil.rmtree(tmp, ignore_errors=True)
+        t0 = time.time()
+        shutil.copytree(src, tmp)
+        os.rename(tmp, dest)
+        log(f"✅ checkpoint-{step} -> Drive ({size / 1e9:.1f} GB, {time.time() - t0:.0f} s)")
+
+sync_log = []
+def sync_loop():
+    log = lambda m: sync_log.append(f"[{time.strftime('%H:%M:%S')}] {m}")
+    while True:
+        training = "train_proc" in globals() and train_proc.poll() is None
+        if not training:
+            time.sleep(65)  # checkpoint cuối vừa ghi: đợi qua ngưỡng 60 s của ready() rồi mới chép lượt cuối
+        try:
+            sync_once(log)
+        except Exception as e:  # Drive tạm lỗi: thử lại ở vòng sau
+            log(f"❌ {type(e).__name__}: {e}")
+            if not training:
+                continue
+        if not training:
+            log("Train đã dừng, chép xong lượt cuối.")
+            return
+        time.sleep(60)
+
+if "sync_thread" in globals() and sync_thread.is_alive():
+    print("Luồng chép đang chạy.")
+else:
+    sync_thread = threading.Thread(target=sync_loop, daemon=True)
+    sync_thread.start()
+    print(f"Đã bật luồng chép checkpoint từ bước {SYNC_FROM_STEP}: {SRC} -> {DST}")
+print("Nhật ký (chạy lại cell này để xem):", *sync_log[-10:], sep="\\n  ")
+print("Trên Drive:", sorted((os.path.basename(p) for p in glob.glob(f"{DST}/checkpoint-*")), key=lambda n: int(n.split("-")[1])))
 """),
         code("""
 # [BƯỚC 8b] Theo dõi train: chạy lại cell này bất cứ lúc nào để xem bước hiện tại, ETA, loss và VRAM.
@@ -634,28 +708,40 @@ print("Checkpoint:", ckpt)
 !cd /content/Isaac-GR00T && MPLBACKEND=Agg .venv/bin/python gr00t/eval/open_loop_eval.py --model-path "{ckpt}" --dataset-path "{dataset_dir}" --embodiment-tag NEW_EMBODIMENT --traj-ids 0 1 --steps 400 --execution-horizon 16
 """),
         code("""
-# [BƯỚC 10] Chép checkpoint mới nhất về Google Drive để dùng với colab_gr00t_server.ipynb.
-# Tự tìm checkpoint, không phụ thuộc Bước 9.
+# [BƯỚC 10] Chép checkpoint về Google Drive để dùng với colab_gr00t_server.ipynb. Bước 8a đã chép mọi checkpoint từ
+# SYNC_FROM_STEP; cell này để chép checkpoint trước mốc đó hoặc khi không bật Bước 8a.
+# COPY_STEPS: "latest" (mới nhất), "all" (mọi checkpoint còn trên ổ tạm), hoặc danh sách bước, ví dụ [4000].
 import glob, os, re, shutil
+COPY_STEPS = "latest"
 if "train_proc" in globals() and train_proc.poll() is None:
-    print("⚠️ Train vẫn đang chạy: checkpoint dưới đây chưa phải checkpoint cuối.")
-ckpts = sorted(glob.glob(f"{os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}/checkpoint-*"),
-               key=lambda p: int(re.search(r"checkpoint-(\\d+)", p).group(1)))
+    print("⚠️ Train vẫn đang chạy: checkpoint mới nhất chưa phải checkpoint cuối.")
+step_of = lambda p: int(re.search(r"checkpoint-(\\d+)$", p).group(1))
+ckpts = sorted(glob.glob(f"{os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}/checkpoint-*"), key=step_of)
 assert ckpts, f"Không thấy checkpoint trong {os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}."
-ckpt = ckpts[-1]
-dest = f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}/{os.path.basename(ckpt)}"
-os.makedirs(os.path.dirname(dest), exist_ok=True)
-print(f"Đang chép {ckpt} -> {dest} ...")
-shutil.copytree(ckpt, dest, dirs_exist_ok=True)
-size_gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(dest) for f in fs) / 1e9
-print(f"✅ Đã chép ({size_gb:.1f} GB).")
+chosen = (ckpts[-1:] if COPY_STEPS == "latest" else ckpts if COPY_STEPS == "all"
+          else [c for c in ckpts if step_of(c) in COPY_STEPS])
+assert chosen, f"Không có checkpoint {COPY_STEPS} trên ổ tạm (còn: {[step_of(c) for c in ckpts]})."
+for ckpt in chosen:
+    dest = f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}/{os.path.basename(ckpt)}"
+    if os.path.isdir(dest):
+        print(f"Đã có trên Drive: {dest}")
+        continue
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    print(f"Đang chép {ckpt} -> {dest} ...")
+    tmp = f"{os.path.dirname(dest)}/_partial_{os.path.basename(ckpt)}"
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(ckpt, tmp)
+    os.rename(tmp, dest)
+    size_gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(dest) for f in fs) / 1e9
+    print(f"✅ Đã chép ({size_gb:.1f} GB).")
 print(f'Chạy server (Bước 5 của colab_gr00t_server.ipynb): MODEL_PATH = "{dest}", EMBODIMENT_TAG = "new_embodiment"')
 print("Ở máy local thêm --vla-action-hz 25.")
 """),
         code("""
-# [BƯỚC 11] Đánh giá open-loop trên tập test độc lập (collect_demos.py --seed 100000, seed không trùng train)
-# và trên cùng số episode của tập train, với checkpoint mới nhất. Cần file zip tập test (TEST_DATASET_NAME ở
-# Bước 4) trên Drive, cùng thư mục với dataset train. Episode chẵn là Coca, lẻ là Pepsi.
+# [BƯỚC 11] Đánh giá open-loop trên tập test độc lập (collect_demos.py --seed 100000, seed không trùng train) với mọi
+# checkpoint từ EVAL_FROM_STEP (ổ tạm, hoặc Drive nếu ổ tạm không còn), chọn checkpoint có MAE test thấp nhất, rồi đánh
+# giá thêm checkpoint đó trên N_EPISODES episode train để xem khoảng cách train-test. Cần file zip tập test
+# (TEST_DATASET_NAME ở Bước 4) trên Drive, cùng thư mục với dataset train. Episode chẵn là Coca, lẻ là Pepsi.
 import glob, json, os, re, subprocess
 import numpy as np
 
@@ -665,12 +751,16 @@ assert os.path.exists(TEST_ZIP), f"Không thấy {TEST_ZIP}: tải file zip tậ
 if not os.path.isdir(TEST_DIR):
     subprocess.run(["unzip", "-q", TEST_ZIP, "-d", os.path.dirname(TEST_DIR)], check=True)
 
-# Checkpoint mới nhất trên ổ tạm; nếu runtime đã khởi động lại thì lấy bản đã chép về Drive ở Bước 10
-step = lambda p: int(re.search(r"checkpoint-(\\d+)", p).group(1))
-ckpts = (sorted(glob.glob(f"{os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']}/checkpoint-*"), key=step)
-         or sorted(glob.glob(f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}/checkpoint-*"), key=step))
-assert ckpts, "Không thấy checkpoint trên ổ tạm lẫn trên Drive."
-ckpt = ckpts[-1]
+# Mọi checkpoint từ EVAL_FROM_STEP: ưu tiên bản trên ổ tạm (nạp nhanh), không còn thì lấy bản trên Drive (Bước 8a/10;
+# nạp từ Drive chậm, vài phút mỗi checkpoint)
+step = lambda p: int(re.search(r"checkpoint-(\\d+)$", p).group(1))
+found = {}
+for root in (os.environ["DRIVE_CKPT_DIR"], os.environ["OUTPUT_DIR"]):  # ổ tạm ghi đè Drive
+    for p in glob.glob(f"{root}/{os.environ['EXPERIMENT']}/checkpoint-*"):
+        if step(p) >= int(os.environ["EVAL_FROM_STEP"]):
+            found[step(p)] = p
+assert found, "Không thấy checkpoint từ EVAL_FROM_STEP trên ổ tạm lẫn trên Drive."
+ckpts = [found[k] for k in sorted(found)]
 isaac_python = "/content/Isaac-GR00T/.venv/bin/python"
 env = {**os.environ, "MPLBACKEND": "Agg"}  # Colab đặt backend matplotlib_inline, môi trường Isaac-GR00T không có
 
@@ -681,10 +771,10 @@ for ds in (os.environ["DATASET_DIR"], TEST_DIR):
         subprocess.run([isaac_python, "-c", f"from gr00t.data.stats import generate_stats; generate_stats('{ds}')"],
                        cwd="/content/Isaac-GR00T", env=env, check=True)
 
-def evaluate(dataset_dir):
+def evaluate(dataset_dir, n_episodes):
     out = subprocess.run(
         [isaac_python, "gr00t/eval/open_loop_eval.py", "--model-path", ckpt, "--dataset-path", dataset_dir,
-         "--embodiment-tag", "NEW_EMBODIMENT", "--traj-ids", *map(str, range(N_EPISODES)), "--steps", "400",
+         "--embodiment-tag", "NEW_EMBODIMENT", "--traj-ids", *map(str, range(n_episodes)), "--steps", "400",
          "--execution-horizon", "16"],
         cwd="/content/Isaac-GR00T", env=env, capture_output=True, text=True)
     rows = re.findall(r"MSE for trajectory (\\d+): ([\\d.e-]+), MAE: ([\\d.e-]+)", out.stdout + out.stderr)
@@ -693,11 +783,21 @@ def evaluate(dataset_dir):
         raise RuntimeError(f"Đánh giá {dataset_dir} lỗi, xem log ở trên.")
     return {int(i): (float(mse), float(mae)) for i, mse, mae in rows}
 
-print("Checkpoint:", ckpt)
-results = {}
-for name, ds in (("train", os.environ["DATASET_DIR"]), ("test", TEST_DIR)):
-    print(f"Đang đánh giá {N_EPISODES} episode {name}...")
-    results[name] = evaluate(ds)
+with open(f"{TEST_DIR}/meta/episodes.jsonl") as f:
+    n_test = sum(1 for line in f if line.strip())
+per_ckpt = {}
+for c in ckpts:
+    print(f"Đang đánh giá {os.path.basename(c)} trên {n_test} episode test...")
+    ckpt = c
+    per_ckpt[c] = evaluate(TEST_DIR, n_test)
+print(f"\\n{'checkpoint':<18}{'MSE test TB':>13}{'MAE test TB':>13}{'MAE lớn nhất':>14}")
+for c, res in per_ckpt.items():
+    v = np.array(list(res.values()))
+    print(f"{os.path.basename(c):<18}{v[:, 0].mean():>13.6f}{v[:, 1].mean():>13.5f}{v[:, 1].max():>14.5f}")
+ckpt = min(per_ckpt, key=lambda c: np.mean([mae for _, mae in per_ckpt[c].values()]))
+print(f"\\n⭐ Checkpoint tốt nhất (MAE test TB thấp nhất): {ckpt}")
+print(f"   Đánh giá thêm {N_EPISODES} episode train; bảng chi tiết dưới đây là của checkpoint này.")
+results = {"train": evaluate(os.environ["DATASET_DIR"], N_EPISODES), "test": per_ckpt[ckpt]}
 
 print(f"\\n{'tập':<6}{'lon':<7}{'số ep':>6}{'MSE TB':>11}{'MAE TB':>10}{'MAE lớn nhất':>14}")
 for name, res in results.items():

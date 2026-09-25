@@ -1100,7 +1100,25 @@ so với `eval/B9000_{ik,swap}_test_20s_stop`. Cùng 40 cảnh mỗi tập, châ
   - Vùng phủ đổi phía (`datasets/g1_can_sort_bal_swap_coverage.png`, tính cả lần bị loại): lon đứng khi hai lon cách < 5 cm chỉ
     1/27 (khoảng 2% mọi cảnh), 5–10 cm 19/49; lon ở xa (x > 0.33 hoặc |y| > 0.11) thu được 40–50%. Các vùng khác ≥ 70%.
   - Ảnh vị trí lon: `datasets/g1_can_sort_bal_can_positions.png`.
-- Train C: batch 64 và đi qua dữ liệu khoảng 8.5 lần như B, nên **`MAX_STEPS` ≈ 8.5 × 99 343 / 64 ≈ 13 200** (B: 12 500).
+- Train C: B thực tế chạy **batch 80 × 10 000 bước** (800k mẫu / 93 200 khung ≈ 8.6 lần đi qua dữ liệu; batch theo người dùng,
+  số bước giả định). Giữ batch 80 và cùng số lần đi qua dữ liệu: **`MAX_STEPS` ≈ 8.6 × 99 343 / 80 ≈ 10 700**, `SAVE_STEPS` 1000,
+  LR 1e-4 mặc định, từ base `nvidia/GR00T-N1.7-3B`. GPU H100 80 GB (batch 80 vừa như A100 80 GB).
+
+### 5.2t. Notebook fine-tune: chép mọi checkpoint về Drive, đánh giá mọi checkpoint (25/09)
+- Trước đây Bước 10 chỉ chép checkpoint mới nhất, Bước 11 chỉ đánh giá checkpoint mới nhất. `examples/finetune.sh` của
+  Isaac-GR00T còn đặt `--save_total_limit 5`, nên trên `/content` checkpoint cũ bị xoá trong lúc train (10 700 bước: mất 5000).
+- `tools/build_colab_notebooks.py` (notebook sinh lại, `verify_pipeline.py` 5/5):
+  - **Bước 8a (mới, chạy ngay sau Bước 8, trước 8c):** luồng nền mỗi phút chép checkpoint từ `SYNC_FROM_STEP` (mặc định 5000)
+    về `MyDrive/gr00t/checkpoints/<DATASET_NAME>/`. Checkpoint "xong" khi có `trainer_state.json` và 60 s không file nào đổi.
+    Chép vào `_partial_checkpoint-N` rồi đổi tên; kiểm tra chỗ trống Drive trước khi chép. Khi train dừng thì đợi 65 s rồi chép
+    lượt cuối (checkpoint cuối). Chạy lại cell để xem nhật ký; runtime khởi động lại thì chạy lại để chép nốt.
+  - **Bước 10:** `COPY_STEPS` = `"latest"` / `"all"` / danh sách bước; bỏ qua checkpoint đã có trên Drive.
+  - **Bước 11:** đánh giá mọi checkpoint từ `EVAL_FROM_STEP` trên toàn bộ tập test (ưu tiên bản trên ổ tạm, không còn thì lấy
+    trên Drive), in bảng MSE/MAE theo checkpoint, chọn checkpoint MAE test thấp nhất, rồi đánh giá nó thêm trên 40 episode
+    train và in các bảng chi tiết như trước.
+  - Mặc định Bước 4 đổi sang C: `g1_can_sort_bal`, batch 80, `MAX_STEPS` 10 700.
+- Thử luồng chép ở máy local với thư mục giả: chép đúng 5000/6000/10700, bỏ 4000 (dưới mốc) và checkpoint vừa ghi (< 60 s).
+- Dung lượng: mỗi checkpoint khoảng 10–15 GB; 5000 → 10700 là 7 checkpoint.
 
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
@@ -1227,7 +1245,8 @@ Mục tiêu: gắp được lon **sâu hơn** trên bàn và **rộng hơn** d�
      (q01 = q99 = 0), còn trong dataset đổi phía dao động tới ±0.6 rad.
    - Để lần fine-tune `g1_can_sort_ik` (đang chạy 24/09) chạy xong; checkpoint đó là mốc đối chứng A.
    - **Sinh lại** với `hold` 2.5 s (mục 5.2d) thành `g1_can_sort_swap_hold` / `g1_can_sort_swap_hold_test`. Tải zip lên
-     `MyDrive/gr00t/`, đặt `DATASET_NAME`/`TEST_DATASET_NAME` tương ứng, batch 64, `MAX_STEPS` ≈ 12 500 (checkpoint B, xem mục 5.2d-bis).
+     `MyDrive/gr00t/`, đặt `DATASET_NAME`/`TEST_DATASET_NAME` tương ứng, batch 80, `MAX_STEPS` 10 000 (checkpoint B, xem mục 5.2d-bis;
+     memo cũ ghi nhầm batch 64 × 12 500).
    - So closed-loop A và B trên cả `g1_can_sort_ik_test` lẫn `g1_can_sort_swap_test`. Dự đoán A hỏng ở ca đổi phía (lối tắt
      "lệnh Coca → tay phải → lon bên phải"). B cần giữ được kết quả ở ca cùng phía.
 6. Plan mở rộng vùng gắp (mục 6): Phase 1 → 2 → 3.
