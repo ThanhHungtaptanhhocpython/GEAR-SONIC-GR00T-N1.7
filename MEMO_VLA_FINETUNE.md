@@ -1119,6 +1119,14 @@ so với `eval/B9000_{ik,swap}_test_20s_stop`. Cùng 40 cảnh mỗi tập, châ
   - Mặc định Bước 4 đổi sang C: `g1_can_sort_bal`, batch 80, `MAX_STEPS` 10 700.
 - Thử luồng chép ở máy local với thư mục giả: chép đúng 5000/6000/10700, bỏ 4000 (dưới mốc) và checkpoint vừa ghi (< 60 s).
 - Dung lượng: mỗi checkpoint khoảng 10–15 GB; 5000 → 10700 là 7 checkpoint.
+- **GPU G4 của Colab (25/09):** NVIDIA RTX PRO 6000 Blackwell Server Edition, 97 887 MiB, driver 580.82 (CUDA 13.0). Trong
+  `.venv` của Isaac-GR00T: torch 2.9.0+cu128 có `sm_120` trong arch list; `flash_attn_func` chạy được trên GPU (bf16).
+- **Kế hoạch train C trên G4: batch 80 × 10 700 bước**, `SAVE_STEPS` 1000, `SYNC_FROM_STEP`/`EVAL_FROM_STEP` 5000, LR 1e-4 (mặc
+  định notebook). G4 có 96 GB nên batch 80 (đã vừa trên A100 80 GB khi train B) chắc chắn vừa, và C chỉ khác B ở dữ liệu.
+  - Đã cân nhắc batch 128 × 6 700 bước (cùng ~8.6 lần đi qua dữ liệu). Cùng tổng số mẫu nên chỉ nhanh hơn chút ít, nhưng số lần
+    cập nhật ít hơn 37% với cùng LR; C sẽ khác B cả dữ liệu lẫn cách train, nên nếu C chỉ hơn/kém B một ít thì không tách được
+    nguyên nhân. Chỉ dùng khi thiếu thời gian GPU (mốc 3000; hết VRAM thì 112 × 7 600 hoặc 96 × 8 900, mốc 4000), và ghi rõ khi
+    so kết quả.
 
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
