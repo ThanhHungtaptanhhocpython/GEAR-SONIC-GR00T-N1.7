@@ -1,0 +1,54 @@
+<section id="overall" data-transition="fade" style="background:#FEFFFE; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 150px 120px; display:flex; flex-direction:column; gap:32px">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#EEF6F1"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:800px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Tổng quan</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">02</p>
+<div style="display:flex; flex-direction:column; gap:14px">
+<h2 style="font-size:64px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Tổng quan bài toán</h2>
+<p style="font-size:30px; color:#5D6B64">Giúp robot hiểu ngữ nghĩa của cảnh và câu lệnh, rồi thực hiện hành động tương ứng</p>
+</div>
+<div style="display:flex; flex-direction:row; align-items:center; gap:24px">
+<div style="width:440px; display:flex; flex-direction:column; gap:12px">
+<p style="font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Ví dụ · phân loại lon</p>
+<img src="/_blob/094397df87a7c87e25a4bffbd8d6c683" alt="Ảnh camera đầu robot nhìn xuống bàn có hai lon và hai khay" style="width:440px; height:200px; object-fit:cover; border-radius:16px">
+<p style="font-size:24px; line-height:1.35; color:#173F2E; background:#F4F7F5; padding:12px 18px; border-radius:12px"><b>Câu lệnh</b> “Pick up the Pepsi can and place it in the blue tray”</p>
+<p style="font-size:24px; color:#173F2E; background:#F4F7F5; padding:12px 18px; border-radius:12px"><b>Trạng thái khớp</b> tay, cổ tay, eo</p>
+</div>
+<x-shape kind="arrow-right" style="width:48px; height:26px; background:#2DB36A"></x-shape>
+<div style="width:300px; display:flex; flex-direction:column; gap:10px; background:#1A4A35; padding:32px; border-radius:20px">
+<h3 style="font-size:36px; font-weight:800; color:#F2F7F4">GR00T N1.7</h3>
+<p style="font-size:24px; color:#BFD8CB">Mô hình VLA, 3 tỉ tham số</p>
+<p style="font-size:24px; color:#F2F7F4">Hiểu ngữ nghĩa ảnh và câu lệnh, sinh 40 bước hành động</p>
+</div>
+<x-shape kind="arrow-right" style="width:48px; height:26px; background:#2DB36A"></x-shape>
+<div style="width:300px; display:flex; flex-direction:column; gap:10px; background:#E6F4EC; border:2px solid #2DB36A; padding:32px; border-radius:20px">
+<h3 style="font-size:36px; font-weight:800; color:#173F2E">GEAR-SONIC</h3>
+<p style="font-size:24px; color:#4B5B53">Bộ điều khiển toàn thân</p>
+<p style="font-size:24px; color:#173F2E">Điều khiển từng khớp và duy trì thăng bằng</p>
+</div>
+<x-shape kind="arrow-right" style="width:48px; height:26px; background:#2DB36A"></x-shape>
+<div style="flex:1; display:flex; flex-direction:column; gap:6px">
+<p style="font-size:96px; font-weight:800; line-height:1.1; color:#1C8A4B">43</p>
+<p style="font-size:28px; font-weight:700; color:#173F2E">mục tiêu góc khớp</p>
+<p style="font-size:24px; color:#5D6B64">29 khớp thân + 14 ngón tay, PD 500 Hz</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:row; gap:24px">
+<div style="flex:1; background:#F4F7F5; border-left:6px solid #2DB36A; border-radius:12px; padding:22px 26px">
+<p style="font-size:26px; line-height:1.35; color:#173F2E"><b>01</b>  Tích hợp GR00T N1.7 với mô phỏng MuJoCo và bộ điều khiển toàn thân</p>
+</div>
+<div style="flex:1; background:#F4F7F5; border-left:6px solid #2DB36A; border-radius:12px; padding:22px 26px">
+<p style="font-size:26px; line-height:1.35; color:#173F2E"><b>02</b>  Xây dựng bộ dữ liệu 400 episode huấn luyện và 40 episode kiểm tra</p>
+</div>
+<div style="flex:1; background:#F4F7F5; border-left:6px solid #2DB36A; border-radius:12px; padding:22px 26px">
+<p style="font-size:26px; line-height:1.35; color:#173F2E"><b>03</b>  Fine-tune trên Google Colab, đánh giá open-loop và closed-loop</p>
+</div>
+</div>
+<aside>Bài toán tổng quát: robot hiểu ngữ nghĩa của cảnh và câu lệnh (vật nào, ở đâu, cần làm gì) rồi thực hiện hành động tương ứng. Phân loại lon Coca-Cola và Pepsi là ví dụ nhóm dùng để thử nghiệm. Đầu vào: ảnh camera đầu, câu lệnh, trạng thái khớp. GR00T N1.7 quyết định làm gì, GEAR-SONIC quyết định từng khớp và giữ thăng bằng. Đầu ra là 43 mục tiêu góc khớp. Ba việc nhóm đã làm: nối hệ thống, tự sinh dữ liệu, fine-tune và đánh giá.</aside>
+</section>
