@@ -73,7 +73,7 @@
 \vfill
 {\large Người thực hiện: \textbf{Nguyễn Duy Hoàng, Phạm Thanh Hưng}\par}
 \vspace{0.3cm}
-{\large Người nhận: Trần Ngọc Sơn\par}
+{\large Mentor: Trần Ngọc Sơn\par}
 \vspace{3cm}
 {\large\bfseries Tháng 9 năm 2026\par}
 \vspace{0.5cm}
@@ -97,7 +97,7 @@ Loại tài liệu & Báo cáo kỹ thuật nội bộ\\
 Đối tượng tìm hiểu & Mô hình \code{nvidia/GR00T-N1.7-3B} và bộ điều khiển toàn thân GEAR-SONIC của NVIDIA\\
 Mục đích & Nắm cách mô hình hoạt động ở mức tổng thể, biết nó khác gì và hơn kém gì so với các mô hình cùng loại, và đánh giá khả năng dùng cho bài toán của nhóm\\
 Người thực hiện & Nguyễn Duy Hoàng, Phạm Thanh Hưng\\
-Người nhận & Trần Ngọc Sơn\\
+Mentor & Trần Ngọc Sơn\\
 Mã nguồn tham chiếu & Isaac-GR00T (commit \code{51d4c89}); GR00T-WholeBodyControl v1.1; dự án nội bộ GEAR-SONIC-GR00T-N1.7\\
 Thời gian & Tháng 9 năm 2026\\
 \bottomrule
@@ -714,7 +714,7 @@ B & Tất cả & 40 & 14 (35\%) & 23 (58\%)\\
 Nhận định:
 \begin{itemize}
 \item A đi lối tắt đúng như dự đoán. Ở cảnh đổi phía A đạt 0/26: tay đi về lon nằm bên phía mình, 20 ca xô lon còn lại, trung bình khép tay 6,8 lần mỗi episode. Ở cảnh cùng phía A đạt 14/14.
-\item B học được nhìn màu lon: 10/22 ca lon nằm đổi phía, và không kém A ở cảnh cùng phía (31 so với 30 trên tập A), dù B chỉ có 200 episode cùng phía, bằng một nửa A. Hai checkpoint hỏng ở các episode khác nhau (cả hai thành công 26, chỉ A 4, chỉ B 5), nên trên 40 episode chưa phân biệt được A với B ở cảnh cùng phía.
+\item B bắt đầu phân biệt được hai lon nhưng chưa ổn định: 10/22 ca lon nằm đổi phía, trong khi ca lon đứng đổi phía vẫn 0/4. B không kém A ở cảnh cùng phía (31 so với 30 trên tập A), dù B chỉ có 200 episode cùng phía, bằng một nửa A. Hai checkpoint hỏng ở các episode khác nhau (cả hai thành công 26, chỉ A 4, chỉ B 5), nên trên 40 episode chưa phân biệt được A với B ở cảnh cùng phía.
 \item Lon đứng đổi phía hỏng hoàn toàn ở cả A và B (0/4). Trong demo nhóm này, cánh tay đi cách lon kia trung vị dưới 1\,cm trước khi kẹp; mô hình lệch 1\,cm là đủ va.
 \item Lon nằm là điểm yếu chung (13/22 ở cả hai). Hai nguyên nhân: (1) mô hình khép tay thiếu tầm 1 đến 3\,cm theo hướng tiến vào lon và lệch ra ngoài 0,4 đến 1,8\,cm, lệch có hướng cố định chứ không phải nhiễu (đo trên A, lớn nhất ở Coca nằm với 3,1\,cm); (2) ở vùng hướng lon mà dữ liệu đổi kiểu gắp, mô hình đổi ý giữa hai chunk, chuyển từ tiếp cận ngang sang úp từ trên xuống, đụng lon làm rơi khỏi bàn. Mỗi lần gọi mô hình (0,3\,s) lấy nhiễu mới nên chunk kế tiếp có thể rơi vào kiểu kia. Giãn khoảng gọi lên 0,6\,s không giúp: 7/10 so với 9/10 trên cùng 10 episode.
 \item Mô hình không biết khi nào xong. Với A, 2/27 ca đặt xong rồi gắp lon ra lại. B giữ yên 2,5\,s nên sửa được các ca này, nhưng nếu cứ chạy tiếp 20\,s thì 3/4 ca hỏng trong 8 episode thử xảy ra sau khi đã xong. Vì vậy đánh giá dừng ngay khi thành công.
@@ -726,24 +726,25 @@ Nhận định:
 Từ ba việc trên, nhóm rút ra các bài học sau, xếp theo thứ tự của chương.
 
 \begin{itemize}
-\item Về nối mô hình với robot: phần tốn công nhất không phải huấn luyện mà là khớp dữ liệu với mô hình, gồm thứ tự khớp, hệ toạ độ, thống kê chuẩn hoá và góc camera. Sai một chỗ là mô hình cho quỹ đạo vô nghĩa mà không báo lỗi. Dữ liệu demo cũng gắn chặt với bộ điều khiển tầng dưới lúc thu: bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, B-9000 giảm từ 31/40 xuống 18/40, nên muốn đổi bộ điều khiển thì phải thu lại demo và huấn luyện lại.
-\item Về dữ liệu demo: dữ liệu phải chặn được lối tắt. Với dữ liệu A, vị trí lon đã đủ để đoán nên mô hình không cần nhìn màu và hỏng 26/26 cảnh đổi phía; chỉ cần thêm cảnh đổi phía ở dữ liệu B là mô hình bắt đầu phân biệt hai lon. Demo phải chừa biên dư lớn hơn sai số của mô hình, khoảng 1 đến 3\,cm, cả ở biên dư kẹp lẫn khoảng hở với lon còn lại; demo đi sát lon kia dưới 1\,cm thì mô hình học theo sẽ va. Demo phải nhất quán: cùng một cảnh thì cùng một kiểu gắp, vì hai kiểu gắp cho những cảnh gần nhau làm mô hình đổi ý giữa hai chunk.
-\item Về fine-tune và đánh giá: quy trình fine-tune của Isaac-GR00T chạy được trên Colab, GPU L4 đủ cho 5\,000 bước với batch 32, A100 80\,GB cho batch 64 và 10\,000 bước; không cần cụm GPU lớn cho bài toán nhỏ. Sai số open-loop thấp không nói lên tỉ lệ thành công: checkpoint pilot có MAE 0,005, khoảng 0,3 độ, nhưng closed-loop chỉ đạt 3/10. Phải đo closed-loop trên một tập cảnh cố định và tách theo nhóm cảnh mới thấy mô hình hỏng ở đâu.
+\item Về nối mô hình với robot: lỗi khó phát hiện nhất không nằm ở huấn luyện mà ở khâu khớp dữ liệu với mô hình, gồm thứ tự khớp, hệ toạ độ, thống kê chuẩn hoá và góc camera. Sai một chỗ là mô hình cho quỹ đạo vô nghĩa mà không báo lỗi. Hai ví dụ nhóm gặp: chế độ remote từng âm thầm chạy quỹ đạo mẫu thay vì GR00T thật; camera nghiêng 24° thay vì 50° làm mô hình zero-shot giơ tay sai. Dữ liệu demo cũng gắn chặt với bộ điều khiển tầng dưới lúc thu: bật chế độ chân tự giữ thăng bằng thay cho khoá cứng, phát lại nguyên demo giảm từ 40/40 còn 17/40 và B-9000 giảm từ 31/40 xuống 18/40, nên muốn đổi bộ điều khiển thì phải thu lại demo và huấn luyện lại.
+\item Về dữ liệu demo: dữ liệu phải chặn được lối tắt. Với dữ liệu A, vị trí lon đã đủ để đoán nên mô hình không cần nhìn màu và hỏng 26/26 cảnh đổi phía; thêm cảnh đổi phía ở dữ liệu B nâng lên 10/26 cảnh đổi phía, cải thiện nhưng chưa giải quyết xong. Demo phải chừa biên dư lớn hơn sai số của mô hình, khoảng 1 đến 3\,cm, cả ở biên dư kẹp lẫn khoảng hở với lon còn lại; demo đi sát lon kia dưới 1\,cm thì mô hình học theo sẽ va. Demo lon đứng đổi phía của B chỉ chừa 0,4\,cm tới lon kia, và B cũng 0/4 ở nhóm này. Demo phải nhất quán: cùng một cảnh thì cùng một kiểu gắp, vì hai kiểu gắp cho những cảnh gần nhau làm mô hình đổi ý giữa hai chunk.
+\item Về fine-tune và đánh giá: quy trình fine-tune của Isaac-GR00T chạy được trên Colab, GPU L4 đủ cho 5\,000 bước với batch 32, A100 80\,GB cho batch 64 và 10\,000 bước; không cần cụm GPU lớn cho bài toán nhỏ. Sai số open-loop thấp không nói lên tỉ lệ thành công: checkpoint pilot có MAE 0,005, khoảng 0,3 độ, nhưng closed-loop chỉ đạt 3/10, vì mô hình lệch có hệ thống khoảng 1\,cm, lớn hơn biên dư kẹp 0,7\,cm của demo. Phải đo closed-loop trên một tập cảnh cố định và tách theo nhóm cảnh mới thấy mô hình hỏng ở đâu.
 \item Về whole-body control: muốn dùng SONIC thật sự phải giải quyết nhãn motion token. Đây là điểm nghẽn để chuyển từ chế độ bám góc khớp sang pipeline chung đầy đủ ở Mục~\ref{sec:combine}.
 \end{itemize}
 
 % ---------------------------------------------------------------------
 \chapter{KẾT LUẬN VÀ ĐỀ XUẤT}
 % ---------------------------------------------------------------------
-GR00T N1.7 là mô hình VLA mở phù hợp nhất hiện nay cho robot hình người nhờ đường đi hoàn chỉnh từ dữ liệu tới bộ điều khiển toàn thân, công cụ triển khai tốt và giấy phép dùng thương mại. So với $\pi_{0.5}$, nó thua ở suy luận nhiều bước và bằng chứng khái quát ngoài đời, nhưng hơn ở hỗ trợ robot hình người và chi phí fine-tune. Nhóm đã nối được mô hình với mô phỏng và bộ điều khiển toàn thân, tự sinh được dữ liệu, và fine-tune thành công về mặt sai số open-loop.
+GR00T N1.7 là mô hình VLA mở phù hợp nhất hiện nay cho robot hình người nhờ đường đi hoàn chỉnh từ dữ liệu tới bộ điều khiển toàn thân, công cụ triển khai tốt và giấy phép dùng thương mại. So với $\pi_{0.5}$, nó thua ở suy luận nhiều bước và bằng chứng khái quát ngoài đời, nhưng hơn ở hỗ trợ robot hình người và chi phí fine-tune. Nhóm đã nối được mô hình với mô phỏng và bộ điều khiển toàn thân, tự sinh được dữ liệu, và fine-tune thành công, đạt 78\% closed-loop trên tập cùng phía và 58\% trên tập có cảnh đổi phía (B-9000).
 
 Về phía GEAR-SONIC, khả năng thực hiện nhiều loại động tác đến từ quy mô huấn luyện: 130 nghìn đoạn chuyển động được luyện song song trên 4.096 robot ảo, với cơ chế tự động ưu tiên các động tác khó. Khả năng nhận lệnh từ nhiều nguồn khác nhau như kính VR, video hay GR00T đến từ việc quy mọi chuyển động về cùng một Universal Token 64 chiều thông qua FSQ và bốn hàm mất mát căn chỉnh. Sự ổn định trên robot thật đến từ việc phân tầng tần số hợp lý: GR00T suy nghĩ ở 2,5\,Hz, policy giữ thăng bằng ở 50\,Hz, và bộ điều khiển PD xử lý lực ở 500\,Hz.
 
 Đề xuất bước tiếp theo, theo thứ tự ưu tiên:
 \begin{enumerate}
-\item Chạy closed-loop với checkpoint fine-tune trên dữ liệu phiên bản hai để có tỉ lệ thành công thật, đây là con số cần có trước khi quyết định đi tiếp.
-\item Hoàn thiện bộ mã hoá SONIC để dữ liệu có nhãn motion token, chuyển sang tag \code{UNITREE\_G1\_SONIC} và có thăng bằng thật.
-\item Nếu mô hình vẫn không phân biệt được hai lon, thử mở bộ mã hoá ảnh hoặc bổ sung LoRA cho backbone, cần GPU 80\,GB.
+\item Hoàn tất checkpoint C: huấn luyện trên dữ liệu 440 episode thu với chân tự giữ thăng bằng, cân bằng 4 nhóm cảnh; mục tiêu là không kém B trên cả hai tập và lon đứng đổi phía vượt 0/4.
+\item Gắp vật lý thật: bỏ cơ chế dính lon vào tay trong mô phỏng, gắp bằng lực ma sát, đồng thời ngẫu nhiên hoá ánh sáng, nền và camera. Nếu lỗi còn lại đến từ nhận diện màu lon thì mới thử LoRA cho bộ mã hoá ảnh, cần GPU 80\,GB.
+\item Kiểm chứng SONIC: gán motion token bằng bộ mã hoá SONIC; nếu đạt thì fine-tune GR00T với tag \code{UNITREE\_G1\_SONIC}, nếu không đạt thì giữ bộ thăng bằng GR00T-WBC.
+\item Thử trên G1 thật: bắt đầu với nhiệm vụ phân loại lon, bổ sung demo thật qua teleop PICO, sau đó mở rộng sang nhiệm vụ mới.
 \item Theo dõi phiên bản GR00T tiếp theo và openpi; nếu $\pi$ bổ sung whole-body control thì cần đánh giá lại lựa chọn.
 \end{enumerate}
 
