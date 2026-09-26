@@ -1,0 +1,51 @@
+<section id="data" data-transition="fade" style="background:#FEFFFE; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 150px 120px; display:flex; flex-direction:column; gap:36px">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#EEF6F1"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:800px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Dữ liệu</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">08</p>
+<div style="display:flex; flex-direction:column; gap:14px">
+<h2 style="font-size:64px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Xây dựng dữ liệu và fine-tune</h2>
+<p style="font-size:30px; color:#5D6B64">Dữ liệu demo sinh trong MuJoCo; mỗi phiên bản khắc phục hạn chế của phiên bản trước</p>
+</div>
+<div style="display:flex; flex-direction:row; gap:40px; align-items:start">
+<div style="width:990px; display:flex; flex-direction:column; gap:14px; background:#F4F7F5; border:1px solid #E2E9E5; border-radius:24px; padding:24px">
+<img src="/_blob/556bcd70d48db8418bdfc56fe6ea8214" alt="Vị trí ban đầu của lon Coca đỏ và Pepsi xanh trong 400 episode, chia cảnh cùng phía và đổi phía" style="width:940px; height:416px; object-fit:contain; border-radius:12px">
+<p style="font-size:24px; color:#5D6B64">Vị trí ban đầu hai lon, phiên bản B · 400 episode · 93.200 khung hình, 25 Hz</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center; border:2px solid #E2E9E5; border-radius:16px; padding:16px 20px">
+<p style="width:96px; font-size:28px; font-weight:800; color:#6E7C75">Pilot</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:2px">
+<p style="font-size:26px; font-weight:700; color:#173F2E">100 demo, quỹ đạo cố định</p>
+<p style="font-size:24px; color:#5D6B64">Mô hình ghi nhớ quỹ đạo, ít dựa vào ảnh</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center; border:2px solid #E2E9E5; border-radius:16px; padding:16px 20px">
+<p style="width:96px; font-size:28px; font-weight:800; color:#1A4A35">A</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:2px">
+<p style="font-size:26px; font-weight:700; color:#173F2E">400 demo, lon đứng và nằm</p>
+<p style="font-size:24px; color:#5D6B64">Hạn chế: vị trí lon gắn cố định với loại lon</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center; background:#E6F4EC; border:2px solid #2DB36A; border-radius:16px; padding:16px 20px">
+<p style="width:96px; font-size:28px; font-weight:800; color:#1C8A4B">B</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:2px">
+<p style="font-size:26px; font-weight:700; color:#173F2E">400 demo, 200 cảnh đổi phía</p>
+<p style="font-size:24px; color:#4B5B53">Buộc mô hình phân biệt lon qua màu</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:column; gap:6px; background:#1A4A35; border-radius:16px; padding:22px 24px">
+<p style="font-size:24px; font-weight:700; color:#2DB36A; letter-spacing:1px; text-transform:uppercase">Fine-tune trên Colab</p>
+<p style="font-size:24px; color:#F2F7F4">A100 80 GB · batch 64 · 10k bước</p>
+<p style="font-size:24px; color:#BFD8CB">Loss 1,33 → 0,0041; backbone đóng băng</p>
+</div>
+</div>
+</div>
+<aside>Không có dataset công khai đúng bài toán nên nhóm tự sinh demo trong mô phỏng theo định dạng LeRobot, 25 Hz. Pilot: quỹ đạo lập trình sẵn, mô hình học thuộc. Bản A: động học ngược cho từng cảnh, lon đứng hoặc nằm hướng bất kỳ, nhưng Coca luôn bên phải nên mô hình có lối tắt. Bản B: thêm 200 cảnh hai lon đổi phía và giữ yên 2,5 s cuối. Chỉ giữ demo phát lại thành công. Fine-tune dưới tag NEW_EMBODIMENT vì tag REAL_G1 giữ thống kê của robot thật.</aside>
+</section>
