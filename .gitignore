@@ -9,6 +9,8 @@ datasets/*
 !datasets/g1_can_sort_swap_can_positions.png
 vla_log*.npz
 snapshots/
+eval/
+third_party/
 
 # LaTeX build artifacts (report/)
 report/build/

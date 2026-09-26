@@ -44,6 +44,15 @@ def grasp_distance(sim, grasp, can_adr) -> float:
     return float(np.linalg.norm(point - d.qpos[can_adr:can_adr + 3]))
 
 
+def grasp_offset_pelvis_cm(sim, grasp, can_adr) -> list:
+    """Vector từ tâm lon tới điểm gắp trong khung pelvis (cm; x trước, y trái, z lên), để xem model lệch theo hướng nào."""
+    d = sim.data
+    w_rot = d.xmat[grasp["wrist_bid"]].reshape(3, 3)
+    point = d.xpos[grasp["wrist_bid"]] + w_rot @ grasp["grasp_point"]
+    p_rot = d.xmat[sim.pelvis_bid].reshape(3, 3)
+    return (p_rot.T @ (point - d.qpos[can_adr:can_adr + 3]) * 100).round(2).tolist()
+
+
 def pelvis_pitch_deg(qpos) -> float:
     w, x, y, z = qpos[3:7]
     return float(np.degrees(np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))))
@@ -54,6 +63,10 @@ def failure_reason(r: dict) -> str:
         return "thành công"
     if r["server_errors"] and r["server_errors"] >= r["policy_calls"]:
         return "server không phản hồi"
+    if r.get("can_fell"):
+        return "lon rơi khỏi bàn"
+    if r.get("in_tray") and r["other_moved_cm"] >= 3.0:
+        return "đặt đúng khay nhưng xô lon còn lại"
     if r["other_moved_cm"] >= 3.0 and not r["grasped"]:
         return "xô lon còn lại"
     if not r["grasped"]:
@@ -69,8 +82,11 @@ def run_episode(job) -> dict:
     task, seed, cfg, args = job
     from PIL import Image
 
+    # Chế độ chân: theo --lower-body nếu có, không thì theo cfg của episode (dataset cũ: fixed)
+    lower_body = args["lower_body"] or cfg.get("lower_body", "fixed")
     pipe_kwargs = {"policy_mode": "remote", "server_host": args["host"], "server_port": args["port"],
-                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"]}
+                   "vla_action_hz": args["hz"], "server_timeout_ms": args["timeout_ms"], "lower_body": lower_body,
+                   "policy_replan_interval": args["replan_steps"]}
     pipe, ctx = cd.setup_episode(task, seed, cfg, pipeline_kwargs=pipe_kwargs)
     sim, policy = pipe.sim, pipe.policy
     if policy.mode != "remote":
@@ -96,29 +112,44 @@ def run_episode(job) -> dict:
     rand = cd.sample_randomization(task, seed, cfg)
     lying, swapped = rand["cans"][can]["lying"], rand["swapped"]
     can_start = sim.data.qpos[can_adr:can_adr + 3].copy()
-    d_close = t_grasp = t_success = None
+    d_close = offset_close = t_grasp = t_success = None
+    attempts, was_closed = 0, False  # số lần khép tay (cạnh lên), để thấy model có thử lại không
     can_max_z, max_pitch = -np.inf, 0.0
     frames = []
     for step in range(int(args["seconds"] * CONTROL_HZ)):
         dist = grasp_distance(sim, grasp, can_adr)
+        offset = grasp_offset_pelvis_cm(sim, grasp, can_adr)  # cùng thời điểm với dist
         was_grasped = sim.is_grasped(can)
         with contextlib.redirect_stdout(io.StringIO()):
             res = pipe.step_50hz()
         if counts["policy_calls"] == 1 and policy.server_action_space not in (None, "real_g1"):
             pipe.close()
             raise RuntimeError(f"Server không chạy model GR00T thật (action_space={policy.server_action_space})")
+        if (counts["policy_calls"] == 1 and args["expect_embodiment"] and policy.server_model
+                and policy.server_model.get("embodiment_tag") != args["expect_embodiment"]):
+            pipe.close()
+            raise RuntimeError(
+                f"Server đang chạy {policy.server_model.get('model_path')} (embodiment "
+                f"{policy.server_model.get('embodiment_tag')}), không phải checkpoint fine-tune "
+                f"(embodiment {args['expect_embodiment']}). Sửa MODEL_PATH/EMBODIMENT_TAG ở Bước 5 của notebook server, "
+                f"hoặc thêm --expect-embodiment '' nếu cố ý đánh giá checkpoint base.")
         if counts["policy_calls"] >= 3 and counts["server_errors"] == counts["policy_calls"]:
             pipe.close()
             raise RuntimeError(f"PolicyServer tcp://{args['host']}:{args['port']} không phản hồi 3 lần liền, dừng đánh giá")
         closure = float(np.mean(np.abs(res["motor_targets"][grasp["hand_ctrl"]][1:])))
         if d_close is None and closure > sim.GRIP_CLOSED_RAD:
             d_close = dist
+            offset_close = offset
+        attempts += closure > sim.GRIP_CLOSED_RAD and not was_closed
+        was_closed = closure > sim.GRIP_CLOSED_RAD
         if t_grasp is None and not was_grasped and sim.is_grasped(can):
             t_grasp = step / CONTROL_HZ
         can_max_z = max(can_max_z, float(sim.data.qpos[can_adr + 2]))
         max_pitch = max(max_pitch, abs(pelvis_pitch_deg(sim.data.qpos)))
         if t_success is None and step % 25 == 0 and cd.is_success(pipe, ctx):
             t_success = step / CONTROL_HZ
+            if args["stop_on_success"]:
+                break
         if args["save_video"] != "none" and step % cd.CONTROL_STEPS_PER_FRAME == 0:
             img = Image.fromarray(sim.render_camera("front_camera")).resize(cd.IMAGE_SIZE, Image.BOX)
             frames.append(np.asarray(img))
@@ -128,13 +159,19 @@ def run_episode(job) -> dict:
     r = {
         "task": task, "seed": seed, "lying": bool(lying), "swapped": bool(swapped),
         "ok": cd.is_success(pipe, ctx), "ok_any": t_success is not None, "t_success": t_success,
+        "in_tray": cd.is_success(pipe, ctx, check_other=False),
         "grasped": t_grasp is not None, "t_grasp": t_grasp,
         "dist_at_close_cm": None if d_close is None else round(d_close * 100, 2),
+        "offset_at_close_cm": offset_close,
         "can_start": can_start.round(3).tolist(), "can_final": d.qpos[can_adr:can_adr + 3].round(3).tolist(),
         "can_max_lift_cm": round(float(can_max_z - can_start[2]) * 100, 1),
+        "can_fell": bool(d.qpos[can_adr + 2] < can_start[2] - 0.2),
+        "attempts": int(attempts),
         "other_moved_cm": round(float(np.linalg.norm(d.qpos[other_adr:other_adr + 3] - ctx["other_start"])) * 100, 1),
         "max_pitch_deg": round(max_pitch, 1),
         "policy_calls": counts["policy_calls"], "server_errors": counts["server_errors"],
+        "server_model": policy.server_model, "lower_body": lower_body, "replan_steps": args["replan_steps"],
+        "stop_on_success": args["stop_on_success"],
     }
     r["reason"] = failure_reason(r)
     pipe.close()
@@ -160,7 +197,8 @@ def load_jobs(args) -> list:
 
 
 def summarize(results: list) -> str:
-    lines = ["", f"{'nhóm':22s} {'thành công':>12s} {'kẹp được':>10s} {'k/c lúc khép (cm)':>18s}"]
+    # "từng đặt xong": có lúc lon đã nằm trong khay (ok_any), kể cả khi sau đó model gắp lại / xô ra
+    lines = ["", f"{'nhóm':22s} {'thành công':>12s} {'từng đặt xong':>14s} {'kẹp được':>10s} {'k/c lúc khép (cm)':>18s}"]
     groups = collections.OrderedDict()
     for r in results:
         keys = ["tất cả", r["task"], f"{r['task']} {'nằm' if r['lying'] else 'đứng'}"]
@@ -171,16 +209,27 @@ def summarize(results: list) -> str:
     for key in ["tất cả"] + sorted(k for k in groups if k != "tất cả"):
         g = groups[key]
         ok = sum(r["ok"] for r in g)
+        ok_any = sum(r["ok_any"] for r in g)
         grasped = sum(r["grasped"] for r in g)
         dists = [r["dist_at_close_cm"] for r in g if r["dist_at_close_cm"] is not None]
         dist = f"{np.mean(dists):.1f} (max {np.max(dists):.1f})" if dists else "-"
-        lines.append(f"{key:22s} {ok:4d}/{len(g):<3d} {100 * ok / len(g):3.0f}% {grasped:6d}/{len(g):<3d} {dist:>18s}")
+        lines.append(f"{key:22s} {ok:4d}/{len(g):<3d} {100 * ok / len(g):3.0f}% {ok_any:6d}/{len(g):<3d} {100 * ok_any / len(g):3.0f}% "
+                     f"{grasped:4d}/{len(g):<3d} {dist:>18s}")
+    t_succ = [r["t_success"] for r in results if r["t_success"] is not None]
+    tries = [r["attempts"] for r in results if "attempts" in r]
+    if tries:
+        lines.append(f"\nSố lần khép tay TB {np.mean(tries):.1f} (tối đa {max(tries)}); "
+                     f"lon rơi khỏi bàn {sum(bool(r.get('can_fell')) for r in results)}/{len(results)}")
+    if t_succ:
+        lines.append(f"Đặt xong lần đầu lúc: trung vị {np.median(t_succ):.1f} s, muộn nhất {max(t_succ):.1f} s")
     lines.append("\nLý do thất bại:")
     for reason, n in collections.Counter(r["reason"] for r in results if not r["ok"]).most_common():
         lines.append(f"  {n:4d}  {reason}")
     errors = sum(r["server_errors"] for r in results)
     calls = sum(r["policy_calls"] for r in results)
     lines.append(f"\nServer: {calls} lần gọi, {errors} lần không phản hồi")
+    models = {json.dumps(r.get("server_model"), ensure_ascii=False) for r in results}
+    lines.append("Model: " + " | ".join(sorted(models)))
     return "\n".join(lines)
 
 
@@ -202,37 +251,70 @@ def main():
     p.add_argument("--cross-can-y", type=float, nargs=2, default=[0.03, 0.15])
     p.add_argument("--tray-jitter", type=float, default=0.02)
     p.add_argument("--joint-noise", type=float, default=0.05)
-    p.add_argument("--seconds", type=float, default=10.0, help="Thời gian chạy mỗi episode (demo dài 7.5 s)")
+    p.add_argument("--seconds", type=float, default=10.0,
+                   help="Thời gian chạy mỗi episode (demo dài 7.5 s). Tăng (ví dụ 30) để model có thời gian thử lại")
     p.add_argument("--hz", type=float, default=cd.ACTION_HZ, help="Tần số action chunk của model (dataset: 25)")
     p.add_argument("--timeout-ms", type=int, default=10000)
+    p.add_argument("--stop-on-success", action="store_true",
+                   help="Kết thúc episode ngay khi đặt xong (như --stop-on-success của launch_vla_simulation.py). Dùng khi "
+                        "tăng --seconds để đo thử lại: không tính lỗi gắp lại lon sau khi đã xong, và chạy nhanh hơn")
+    p.add_argument("--replan-steps", type=int, default=15,
+                   help="Số bước 50 Hz chạy theo một action chunk trước khi gọi model lần sau (15 = 0.3 s). Tăng (ví dụ "
+                        "30) để model ít đổi ý giữa các chunk, như lúc tay lưỡng lự giữa hai kiểu gắp lon nằm")
+    p.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
+                   help="fixed: chân khoá cứng; balance: policy thăng bằng của NVIDIA điều khiển chân + eo. Mặc định theo "
+                        "cfg của episode (lower_body lúc thu demo; dataset trước 25/09: fixed)")
+    p.add_argument("--expect-embodiment", default="new_embodiment",
+                   help="Dừng nếu server báo embodiment khác (mặc định: checkpoint fine-tune). '' để bỏ kiểm tra")
     p.add_argument("--workers", type=int, default=2,
                    help="Số episode chạy song song (server xử lý tuần tự, 2 giúp sim chạy trong lúc chờ GPU)")
     p.add_argument("--save-video", choices=["none", "fail", "all"], default="fail",
                    help="Ghi video camera front_camera cho episode thất bại / tất cả")
+    p.add_argument("--resume", action="store_true",
+                   help="Giữ kết quả đã có trong <out>/results.jsonl, chỉ chạy các episode (task, seed) còn thiếu")
     args = p.parse_args()
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     shared = {"host": args.host, "port": args.port, "hz": args.hz, "timeout_ms": args.timeout_ms,
+              "expect_embodiment": args.expect_embodiment, "lower_body": args.lower_body, "replan_steps": args.replan_steps,
+              "stop_on_success": args.stop_on_success,
               "seconds": args.seconds, "save_video": args.save_video, "out": str(out)}
     jobs = [(t, s, cfg, shared) for t, s, cfg in load_jobs(args)]
+    results = []
+    if args.resume and (out / "results.jsonl").exists():
+        results = [json.loads(line) for line in open(out / "results.jsonl") if line.strip()]
+        done = {(r["task"], r["seed"]) for r in results}
+        jobs = [j for j in jobs if (j[0], j[1]) not in done]
+        print(f"--resume: đã có {len(results)} episode, còn {len(jobs)}")
+    n_total = len(results) + len(jobs)
     print(f"Đánh giá {len(jobs)} episode trên tcp://{args.host}:{args.port} -> {out}")
 
-    results, t0 = [], time.time()
-    # Mỗi tiến trình một episode (tạo pipeline lặp lại trong cùng tiến trình bị rò rỉ bộ nhớ)
-    with Pool(args.workers, maxtasksperchild=1) as pool, open(out / "results.jsonl", "w") as f:
-        for r in pool.imap_unordered(run_episode, jobs):
-            results.append(r)
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-            f.flush()
-            print(f"[{time.time() - t0:5.0f}s] {len(results):3d}/{len(jobs)} {r['task']:5s} seed {r['seed']:6d} "
-                  f"{'nằm ' if r['lying'] else 'đứng'}{' đổi phía' if r['swapped'] else ''} "
-                  f"{'OK  ' if r['ok'] else 'FAIL'} | {r['reason']} | "
-                  f"k/c khép {r['dist_at_close_cm']} cm | lỗi server {r['server_errors']}", flush=True)
-
-    summary = summarize(results)
-    (out / "summary.txt").write_text(summary + "\n")
-    print(summary)
+    n_before, t0 = len(results), time.time()
+    # Mỗi tiến trình một episode (tạo pipeline lặp lại trong cùng tiến trình bị rò rỉ bộ nhớ).
+    # Ghi summary cả khi bị dừng giữa chừng (Ctrl+C, server không phản hồi); chạy tiếp bằng --resume.
+    try:
+        with Pool(args.workers, maxtasksperchild=1) as pool, open(out / "results.jsonl", "a" if args.resume else "w") as f:
+            for r in pool.imap_unordered(run_episode, jobs):
+                results.append(r)
+                if len(results) == n_before + 1:
+                    m = r["server_model"]
+                    print(f"Server: {m['model_path']} (embodiment {m['embodiment_tag']})" if m else
+                          "⚠️ Server bản cũ không báo đang chạy checkpoint nào; không kiểm tra được --expect-embodiment.")
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                f.flush()
+                print(f"[{time.time() - t0:5.0f}s] {len(results):3d}/{n_total} {r['task']:5s} seed {r['seed']:6d} "
+                      f"{'nằm ' if r['lying'] else 'đứng'}{' đổi phía' if r['swapped'] else ''} "
+                      f"{'OK  ' if r['ok'] else 'FAIL'} | {r['reason']} | "
+                      f"k/c khép {r['dist_at_close_cm']} cm | lỗi server {r['server_errors']}", flush=True)
+    finally:
+        if results:
+            summary = summarize(results)
+            if len(results) < n_total:
+                summary = (f"⚠️ CHƯA ĐỦ: {len(results)}/{n_total} episode (bị dừng giữa chừng; "
+                           f"chạy lại cùng lệnh với --resume để làm tiếp)\n") + summary
+            (out / "summary.txt").write_text(summary + "\n")
+            print(summary)
 
 
 if __name__ == "__main__":

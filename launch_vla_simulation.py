@@ -5,18 +5,26 @@ Tích hợp:
   - VLA Policy GR00T N1.7 tiếp nhận lệnh ngôn ngữ và ảnh camera ego_view.
   - GEAR-SONIC Whole-Body Controller giải mã hành động và ổn định thăng bằng toàn thân ở 50 Hz.
   - Cửa sổ đồ họa tương tác 3D MuJoCo Viewer hỗ trợ phím nóng điều khiển trong thời gian thực:
-      [1]     : Chuyển sang nhiệm vụ Coca-Cola
-      [2]     : Chuyển sang nhiệm vụ Pepsi
+      [F8]    : Chuyển sang nhiệm vụ Coca-Cola
+      [F9]    : Chuyển sang nhiệm vụ Pepsi
       [SPACE] : Tạm dừng / Tiếp tục mô phỏng
-      [R]     : Đặt lại (Reset) robot và lon nước về vị trí ban đầu (cảnh ngẫu nhiên hiện tại nếu có)
-      [N]     : Cảnh ngẫu nhiên kế tiếp (seed + 1, hoặc episode kế tiếp của --scene-dataset)
-      [S]     : Chụp và lưu ảnh snapshot từ camera ego_view & front_camera
+      [F10]   : Đặt lại (Reset) robot và lon nước về vị trí ban đầu (cảnh ngẫu nhiên hiện tại nếu có)
+      [F11]   : Cảnh ngẫu nhiên kế tiếp (seed + 1, hoặc episode kế tiếp của --scene-dataset)
+      [F12]   : Chụp và lưu ảnh snapshot từ camera ego_view & front_camera
+  Viewer MuJoCo đã dùng mọi chữ cái (và 0-9, F1-F7) làm phím tắt hiển thị: trước đây 1 / 2 / N / R / S của launcher
+  đồng thời ẩn mesh robot (geom group 2), tô màu constraint island, tắt phản chiếu / bóng. Nên dùng F8-F12.
       [ESC]   : Thoát chương trình
 
 Mặc định lon ở vị trí cố định trong scene XML. Muốn đặt cảnh ngẫu nhiên như lúc thu demo (collect_demos.py):
   --scene-seed N                        : lấy mẫu vị trí/hướng lon, khay đích, nhiễu khớp tay theo seed N
                                           (--swap-prob, --lying-prob chỉnh cách lấy mẫu)
   --scene-dataset DIR --scene-episode K : dựng lại đúng cảnh của episode K trong dataset (kể cả nhiệm vụ)
+
+--lower-body balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều khiển chân + eo (robot tự đứng vững,
+ngả ~2-3° thay vì 5-11° khi vươn tay); mặc định fixed: chân khoá cứng như lúc thu demo.
+
+Mặc định (--stop-on-success) khi lon đã nằm trong đúng khay và tay đã nhả, chờ tay về gần tư thế ready rồi ngừng gọi
+model và giữ nguyên tư thế ready, tới khi bấm F10 / F11 / F8 / F9. --no-stop-on-success để model chạy liên tục.
 """
 
 import argparse
@@ -52,6 +60,41 @@ TASK_PROMPTS = {
     "2": "Pick up the Pepsi can and place it in the blue tray",
 }
 TASK_OF_KEY = {"1": "coke", "2": "pepsi"}
+
+# Mã phím GLFW mà key_callback của viewer nhận được (F1-F7 viewer đã dùng)
+KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12 = 297, 298, 299, 300, 301
+
+# --stop-on-success: sau khi lon nằm trong khay và đã nhả, chờ cổ tay rút ra xa lon thêm RETREAT_CLEAR_M so với lúc nhả
+# (hoặc tối đa DONE_WAIT_STEPS bước 50 Hz) rồi mới về ready và giữ, để tay rút khỏi khay theo quỹ đạo của model thay vì
+# nội suy thẳng từ trong khay (có thể quét lon vừa đặt). Không chờ tay về hẳn ready: tư thế "ready" của model lệch tới
+# ~0.4 rad, và khoảng 2 s sau khi nhả model thường bắt đầu vươn tay gắp lại.
+RETREAT_CLEAR_M = 0.06
+DONE_WAIT_STEPS = 100
+
+
+def can_placed(pipeline, task: str) -> bool:
+    """Lon của nhiệm vụ `task` nằm trong khay cùng màu và tay đã nhả (ngưỡng như collect_demos.is_success)."""
+    sim = pipeline.sim
+    d = sim.data
+    adr = sim.coke_adr if task == "coke" else sim.pepsi_adr
+    tray = d.xpos[mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_BODY, f"{task}_tray")]
+    pos = d.qpos[adr:adr + 3]
+    return bool(np.all(np.abs(pos[:2] - tray[:2]) < 0.08) and pos[2] < tray[2] + 0.1 and not sim.is_grasped(task))
+
+
+def ready_path(pipeline, task: str):
+    """Đường về ready của planner (nhấc tay khỏi khay rồi về); None (nội suy thẳng) nếu IK/va chạm không cho phép."""
+    from sim.pick_place_planner import PickPlacePlanner, PlanningError
+    try:
+        return PickPlacePlanner(pipeline.sim, task).return_to_ready(pipeline.wbc.last_ctrl)
+    except PlanningError as e:
+        print(f"\n⚠️ Không lập được đường về ready ({e}); nội suy thẳng về ready.")
+        return None
+
+
+def wrist_can_dist(pipeline, task: str) -> float:
+    grasp, d = pipeline.sim.grasps[task], pipeline.sim.data
+    return float(np.linalg.norm(d.xpos[grasp["wrist_bid"]] - d.xpos[grasp["can_bid"]]))
 
 
 class SceneSource:
@@ -108,7 +151,7 @@ def save_snapshots(sim):
         Image.fromarray(ego_img).save(ego_path)
         Image.fromarray(front_img).save(front_path)
 
-        print(f"\n📸 [PHÍM S] Đã lưu snapshot thành công:")
+        print(f"\n📸 [F12] Đã lưu snapshot thành công:")
         print(f"   -> {ego_path}")
         print(f"   -> {front_path}\n")
     except Exception as e:
@@ -164,6 +207,12 @@ def main():
         help="Thời gian chờ tối đa một lần truy vấn PolicyServer (ms). Tăng lên nếu GPU Colab chậm (ví dụ T4).",
     )
     parser.add_argument(
+        "--replan-steps",
+        type=int,
+        default=15,
+        help="Số bước 50 Hz chạy theo một action chunk trước khi gọi model lần sau (15 = 0.3 s).",
+    )
+    parser.add_argument(
         "--vla-action-hz",
         type=float,
         default=DEFAULT_ACTION_HZ,
@@ -191,6 +240,14 @@ def main():
         choices=["kinematic", "onnx"],
         help="Chế độ giải mã WBC: kinematic (đứng vững & gắp lon ổn định, mặc định) hoặc onnx (mạng nơ-ron GEAR-SONIC).",
     )
+    parser.add_argument("--debug-keys", action="store_true",
+                        help="In mã phím mà viewer chuyển cho script (F8-F12 phải ra 297-301), để kiểm tra phím F")
+    parser.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
+                        help="fixed: chân khoá cứng; balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều "
+                             "khiển chân + eo (bridge/lower_body_policy.py). Mặc định: theo cfg của episode khi dùng "
+                             "--scene-dataset (dataset trước 25/09: fixed), còn lại fixed")
+    parser.add_argument("--stop-on-success", action=argparse.BooleanOptionalAction, default=True,
+                        help="Đặt xong lon thì ngừng gọi model, giữ tư thế ready tới khi bấm F10/F11/F8/F9 (mặc định bật)")
     args = parser.parse_args()
 
     # Tự động mở SSH tunnel nếu có --ssh-tunnel
@@ -226,6 +283,10 @@ def main():
     current_task = TASK_OF_KEY[args.task]
     if scenes is not None and scenes.episodes is not None:
         current_task = scenes.current(current_task)[0]
+    if args.lower_body is None:
+        # Pipeline tạo một lần nên chế độ chân lấy theo episode đầu; F11 sang episode khác không đổi chế độ
+        use_cfg = scenes is not None and scenes.episodes is not None
+        args.lower_body = scenes.current(current_task)[2].get("lower_body", "fixed") if use_cfg else "fixed"
     key_of_task = {t: k for k, t in TASK_OF_KEY.items()}
     init_prompt = args.prompt if args.prompt else TASK_PROMPTS[key_of_task[current_task]]
 
@@ -235,6 +296,7 @@ def main():
     print(f"  * Nhiệm vụ ban đầu : {init_prompt}")
     print(f"  * Chế độ Policy    : {args.policy_mode.upper()}")
     print(f"  * Chế độ WBC       : {args.wbc_mode.upper()} (Đứng vững & Thao tác)")
+    print(f"  * Chân             : {'policy thăng bằng NVIDIA' if args.lower_body == 'balance' else 'khoá cứng'}")
     if args.policy_mode == "remote":
         print(f"  * PolicyServer     : tcp://{args.server_host}:{args.server_port}")
     print("=" * 70)
@@ -247,8 +309,10 @@ def main():
         server_port=args.server_port,
         wbc_mode=args.wbc_mode,
         vla_action_hz=args.vla_action_hz,
+        policy_replan_interval=args.replan_steps,
         server_timeout_ms=args.server_timeout_ms,
         record_vla_path=args.record_vla,
+        lower_body=args.lower_body,
     )
 
     def apply_scene():
@@ -267,13 +331,16 @@ def main():
     apply_scene()
 
     print("\n🎮 PHÍM NÓNG ĐIỀU KHIỂN TRONG CỬA SỔ 3D:")
-    print("  [1]     : Chuyển sang nhiệm vụ 'Gắp lon Coca-Cola sang khay đỏ' (Dùng tay phải)")
-    print("  [2]     : Chuyển sang nhiệm vụ 'Gắp lon Pepsi sang khay xanh' (Dùng tay trái)")
+    print("  [F8]    : Chuyển sang nhiệm vụ 'Gắp lon Coca-Cola sang khay đỏ' (Dùng tay phải)")
+    print("  [F9]    : Chuyển sang nhiệm vụ 'Gắp lon Pepsi sang khay xanh' (Dùng tay trái)")
     print("  [SPACE] : Tạm dừng (Pause) / Tiếp tục (Resume) mô phỏng")
-    print("  [R]     : Đặt lại (Reset) robot và lon nước về vị trí ban đầu (cảnh ngẫu nhiên hiện tại nếu có)")
+    print("  [F10]   : Đặt lại (Reset) robot và lon nước về vị trí ban đầu (cảnh ngẫu nhiên hiện tại nếu có)")
     if scenes is not None:
-        print("  [N]     : Cảnh ngẫu nhiên kế tiếp (phím N cũng bật/tắt hiển thị constraint của viewer)")
-    print("  [S]     : Chụp và lưu ảnh snapshot từ camera robot vào ./snapshots/")
+        print("  [F11]   : Cảnh ngẫu nhiên kế tiếp")
+    print("  [F12]   : Chụp và lưu ảnh snapshot từ camera robot vào ./snapshots/")
+    if args.stop_on_success:
+        print("  (Đặt xong lon thì robot giữ tư thế ready, chờ F10 / F11 / F8 / F9; tắt bằng --no-stop-on-success)")
+    print("  Các chữ cái và phím số là phím tắt hiển thị của viewer MuJoCo (ví dụ 2 ẩn robot, N tô màu island)")
     print("  [ESC]   : Thoát chương trình")
     print("  Chuột trái: Xoay 3D | Chuột phải: Di chuyển | Cuộn chuột: Phóng to/Thu nhỏ\n")
 
@@ -286,29 +353,29 @@ def main():
     # Hàm callback xử lý phím bấm trong cửa sổ MuJoCo 3D Viewer (Chạy trên GLFW GUI thread)
     def key_callback(keycode: int):
         nonlocal pending_prompt, reset_requested, snapshot_requested, next_scene_requested, current_task
-        # Phím '1' (ASCII 49): Coca-Cola
-        if keycode in (ord("1"), 49):
+        if args.debug_keys:
+            print(f"[phím] keycode = {keycode}")
+        if keycode == KEY_F8:
             pending_prompt = TASK_PROMPTS["1"]
             current_task = "coke"
-            print(f"\n👉 [PHÍM 1] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
-        # Phím '2' (ASCII 50): Pepsi
-        elif keycode in (ord("2"), 50):
+            print(f"\n👉 [F8] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
+        elif keycode == KEY_F9:
             pending_prompt = TASK_PROMPTS["2"]
             current_task = "pepsi"
-            print(f"\n👉 [PHÍM 2] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
-        # Phím N / n: cảnh ngẫu nhiên kế tiếp
-        elif scenes is not None and keycode in (ord("n"), ord("N"), 78, 110):
-            next_scene_requested = True
+            print(f"\n👉 [F9] ĐÃ CHUYỂN NHIỆM VỤ: '{pending_prompt}'")
+        elif keycode == KEY_F11:
+            if scenes is not None:
+                next_scene_requested = True
+            else:
+                print("\n⚠️  [F11] Không có danh sách cảnh: khởi động với --scene-seed N hoặc --scene-dataset DIR để dùng F11.")
         # Phím SPACE (ASCII 32): Pause / Resume
         elif keycode in (ord(" "), 32):
             pipeline.is_paused = not pipeline.is_paused
             st = "TẠM DỪNG (PAUSED)" if pipeline.is_paused else "TIẾP TỤC (RESUMED)"
             print(f"\n⏸️  [SPACE] Trạng thái mô phỏng: {st}")
-        # Phím R / r (ASCII 82, 114): Reset
-        elif keycode in (ord("r"), ord("R"), 82, 114):
+        elif keycode == KEY_F10:
             reset_requested = True
-        # Phím S / s (ASCII 83, 115): Chụp ảnh
-        elif keycode in (ord("s"), ord("S"), 83, 115):
+        elif keycode == KEY_F12:
             snapshot_requested = True
 
     model = pipeline.sim.model
@@ -330,6 +397,7 @@ def main():
 
             last_time = time.time()
             print_timer = 0.0
+            done_steps, release_dist = 0, 0.0
 
             while viewer.is_running():
                 step_start = time.time()
@@ -344,7 +412,7 @@ def main():
                     reset_requested = False
                     with viewer.lock():
                         apply_scene()
-                    print("\n🔄 [PHÍM R] Đã reset an toàn môi trường robot và lon nước về vị trí ban đầu.")
+                    print("\n🔄 [F10] Đã reset an toàn môi trường robot và lon nước về vị trí ban đầu.")
 
                 if next_scene_requested:
                     next_scene_requested = False
@@ -358,6 +426,21 @@ def main():
 
                 # Bước 1 chu kỳ 50 Hz (20 ms)
                 res = pipeline.step_50hz(physics_lock=viewer.lock)
+
+                if args.stop_on_success and not res.get("paused") and not pipeline.holding_ready:
+                    if not can_placed(pipeline, current_task):
+                        done_steps = 0
+                    else:
+                        if done_steps == 0:
+                            release_dist = wrist_can_dist(pipeline, current_task)
+                        done_steps += 1
+                    if done_steps and (wrist_can_dist(pipeline, current_task) >= release_dist + RETREAT_CLEAR_M
+                                       or done_steps >= DONE_WAIT_STEPS):
+                        done_steps = 0
+                        pipeline.hold_ready(ready_path(pipeline, current_task))
+                        keys = "F10 (làm lại cảnh này) / F11 (cảnh tiếp)" if scenes is not None else "F10 (làm lại)"
+                        print(f"\n✅ Đã đặt lon {current_task} vào khay. Robot giữ tư thế ready, không gọi model nữa. "
+                              f"Bấm {keys} hoặc F8 / F9 (đổi nhiệm vụ).")
 
                 # Đồng bộ hiển thị giao diện 3D Viewer
                 viewer.sync()

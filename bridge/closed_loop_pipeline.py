@@ -19,6 +19,9 @@ from bridge.sonic_wbc_controller import SonicWBCController
 from bridge.gr00t_policy_client import Gr00tN17Policy
 from bridge.real_g1_adapter import DEFAULT_ACTION_HZ, VIDEO_HISTORY_STEPS, RealG1Adapter
 
+# Số bước 50 Hz trộn từ mục tiêu điều khiển hiện tại sang đường về ready khi bắt đầu giữ (hold_ready)
+HOLD_BLEND_STEPS = 50
+
 
 class ClosedLoopVLAPipeline:
     """Bộ điều phối vòng lặp khép kín VLA + WBC + MuJoCo cho Unitree G1."""
@@ -36,6 +39,8 @@ class ClosedLoopVLAPipeline:
         vla_action_hz: float = DEFAULT_ACTION_HZ,  # Tần số dữ liệu của action chunk REAL_G1
         server_timeout_ms: int = 3000,
         record_vla_path: Optional[str] = None,  # File .npz ghi state/action/ảnh của mỗi lần gọi model GR00T thật
+        lower_body: str = "fixed",  # "fixed": chân khoá cứng như lúc thu demo; "balance": policy thăng bằng của NVIDIA
+        balance_height: float = 0.82,  # lệnh chiều cao pelvis cho policy thăng bằng (0.82 -> đứng ở ~0.77 m)
     ):
         self.task_prompt = task_prompt
         self.policy_replan_interval = policy_replan_interval
@@ -69,6 +74,16 @@ class ClosedLoopVLAPipeline:
         self.record_vla_path = record_vla_path
         self.vla_log: list = []
 
+        # Chân: khoá cứng ở tư thế đứng mặc định, hoặc policy thăng bằng điều khiển chân + eo (bridge/lower_body_policy.py)
+        if lower_body not in ("fixed", "balance"):
+            raise ValueError(f"lower_body phải là 'fixed' hoặc 'balance', nhận '{lower_body}'")
+        self.balance = None
+        if lower_body == "balance":
+            from bridge.lower_body_policy import BalancePolicy
+            self.balance = BalancePolicy(self.sim, height_cmd=balance_height)
+            self.balance.apply_gains()
+            self._init_balance()
+
         # Trạng thái vòng lặp
         self.current_action_chunk: Optional[Dict[str, np.ndarray]] = None
         self.chunk_step_idx = 0
@@ -77,6 +92,10 @@ class ClosedLoopVLAPipeline:
         self.pending_prompt: Optional[str] = None
         self.render_failures = 0
         self.is_paused = False
+        # Giữ tư thế ready (không gọi model) sau khi xong nhiệm vụ: None khi không giữ
+        self.hold_from: Optional[np.ndarray] = None
+        self.hold_path: list = []
+        self.hold_step = 0
 
     def set_task_prompt(self, new_prompt: str):
         """Thay đổi câu lệnh nhiệm vụ ngôn ngữ trong thời gian thực.
@@ -111,19 +130,51 @@ class ClosedLoopVLAPipeline:
         self.chunk_step_idx = 0
         self.task_step = 0
         self.current_action_chunk = None
+        self.hold_from = None
         print(f"\n[VLA Pipeline] Đã chuyển đổi nhiệm vụ sang: '{self.task_prompt}'")
 
     def reset(self):
         """Khôi phục toàn bộ hệ thống về trạng thái ban đầu."""
         self.sim.reset()
         self.wbc.reset()
+        if self.balance is not None:
+            self._init_balance()
         self.ego_history.clear()
         self.current_action_chunk = None
         self.chunk_step_idx = 0
         self.total_steps_executed = 0
         self.task_step = 0
+        self.hold_from = None
         if self.pending_prompt is not None:
             self._apply_task_prompt(self.pending_prompt)
+
+    def _init_balance(self):
+        """Đặt chân vào tư thế của policy thăng bằng, cho đứng vững 2 s ở tư thế ready rồi dời về vị trí ban đầu."""
+        self.balance.reset()
+        self.balance.init_pose()
+        self.balance.settle(self.sim.default_ctrl, substeps=self.substeps_per_wbc)
+        self.sim.data.time = 0.0
+
+    def _lower_body(self, motor_targets: np.ndarray) -> np.ndarray:
+        """Chế độ balance: thay mục tiêu 12 khớp chân + 3 khớp eo bằng output của policy thăng bằng. Góc eo mà VLA ra
+        lệnh được đổi thành hướng thân mong muốn cho policy (như decoupled WBC của NVIDIA)."""
+        if self.balance is None:
+            return motor_targets
+        out = np.asarray(motor_targets, dtype=np.float32).copy()
+        out[:15] = self.balance(out[12:15])
+        return out
+
+    @property
+    def holding_ready(self) -> bool:
+        return self.hold_from is not None
+
+    def hold_ready(self, path: Optional[list] = None):
+        """Ngừng gọi model và đi theo `path` (mục tiêu actuator 50 Hz, ví dụ PickPlacePlanner.return_to_ready) rồi giữ
+        mục tiêu cuối, tới khi reset hoặc đổi nhiệm vụ. Không có path thì nội suy thẳng về tư thế ready. Đầu đường đi
+        được trộn dần từ mục tiêu hiện tại trong HOLD_BLEND_STEPS bước."""
+        self.hold_from = self.wbc.last_ctrl.copy()
+        self.hold_path = list(path) if path else [self.sim.default_ctrl.copy()]
+        self.hold_step = 0
 
     def step_50hz(self, physics_lock: Optional[Callable[[], ContextManager]] = None) -> Dict[str, Any]:
         """Thực thi một chu kỳ điều khiển 50 Hz (20 ms).
@@ -140,12 +191,32 @@ class ClosedLoopVLAPipeline:
         if self.is_paused:
             # Nếu tạm dừng, duy trì vị trí hiện tại
             with lock():
-                self.sim.step(self.wbc.last_ctrl, n_substeps=self.substeps_per_wbc)
+                self.sim.step(self._lower_body(self.wbc.last_ctrl), n_substeps=self.substeps_per_wbc)
             return {"paused": True}
 
         # Nhiệm vụ bị hoãn vì đang cầm lon được áp dụng khi nhiệm vụ hiện tại xong
         if self.pending_prompt is not None and self.task_done:
             self._apply_task_prompt(self.pending_prompt)
+
+        if self.hold_from is not None:
+            w = min(self.hold_step / HOLD_BLEND_STEPS, 1.0)
+            w = w * w * (3.0 - 2.0 * w)
+            target = self.hold_path[min(self.hold_step, len(self.hold_path) - 1)]
+            motor_targets = self._lower_body(self.wbc.track_joint_targets((1.0 - w) * self.hold_from + w * target))
+            with lock():
+                self.sim.step(motor_targets, n_substeps=self.substeps_per_wbc)
+            self.hold_step += 1
+            self.total_steps_executed += 1
+            return {
+                "paused": False,
+                "holding": True,
+                "sim_time": self.sim.data.time,
+                "motor_targets": motor_targets,
+                "coke_pos": self.sim.data.qpos[self.sim.coke_adr : self.sim.coke_adr + 3].copy(),
+                "pepsi_pos": self.sim.data.qpos[self.sim.pepsi_adr : self.sim.pepsi_adr + 3].copy(),
+                "chunk_idx": self.chunk_step_idx,
+                "total_steps": self.total_steps_executed,
+            }
 
         # 1. Thu nhận trạng thái khớp @ 50 Hz (siêu nhanh, không tốn chi phí render)
         robot_state = self.sim.get_state()
@@ -195,6 +266,7 @@ class ClosedLoopVLAPipeline:
             )
 
         # 5. MuJoCo bước 10 substeps (10 x 0.002s = 0.02s ~ 50 Hz)
+        motor_targets = self._lower_body(motor_targets)
         with lock():
             self.sim.step(motor_targets, n_substeps=self.substeps_per_wbc)
 

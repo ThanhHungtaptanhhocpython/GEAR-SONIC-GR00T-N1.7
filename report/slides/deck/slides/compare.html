@@ -1,0 +1,49 @@
+<section id="compare" data-transition="fade" style="background:#FFFFFF; color:#3F4F47; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:204px 128px 110px 120px; display:flex; flex-direction:column; gap:30px">
+
+<div style="position:absolute; left:0px; top:0px; width:30px; height:1080px; background:linear-gradient(180deg, #2DB36A 0%, #0E6B3F 45%, #0A3F28 100%)"></div>
+<svg aria-hidden="true" width="1320" height="200" viewBox="0 0 1320 200" style="position:absolute; left:600px; top:0px; width:1320px; height:200px">
+<defs><linearGradient id="rb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E6F5EC" stop-opacity="0"/><stop offset="1" stop-color="#BFE6CF"/></linearGradient>
+<linearGradient id="rc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EAF7EF"/><stop offset="1" stop-color="#C4E9D3"/></linearGradient></defs>
+<polygon points="0,116 900,116 836,190 0,190" fill="url(#rb)"/>
+<polygon points="1000,190 1160,0 1320,0 1320,190" fill="url(#rc)"/>
+<polygon points="1150,190 1310,0 1320,0 1320,190" fill="#B3E2C6" opacity="0.8"/>
+<line x1="1080" y1="190" x2="1240" y2="0" stroke="#FFFFFF" stroke-width="3"/>
+</svg>
+<img src="/_blob/baafa340f95ff6609ebd3c315364b382" alt="VinDynamics" style="position:absolute; left:100px; top:52px; width:460px; height:97px; object-fit:contain">
+<div style="position:absolute; left:112px; top:990px; width:1620px; height:2px; background:linear-gradient(90deg, #8FCDA9 0%, #D9EEE2 100%)"></div>
+<p style="position:absolute; left:112px; top:1012px; width:600px; font-size:24px; color:#6B7A72">VinDynamics  |  Confidential</p>
+<p style="position:absolute; left:1744px; top:970px; width:120px; font-size:28px; font-weight:700; line-height:1.4; text-align:center; color:#123F2B; background:#E6F4EC; padding:10px 0px; border-radius:16px">05</p>
+<div style="display:flex; flex-direction:column; gap:14px">
+<h2 style="font-size:64px; font-weight:800; line-height:1.12; letter-spacing:-1px; color:#123F2B; text-transform:uppercase">So sánh với các mô hình VLA khác</h2>
+<p style="font-size:34px; line-height:1.35; color:#6B7A72">Cùng kiến trúc VLM kết hợp action head, khác biệt ở mục tiêu và dữ liệu</p>
+<div style="width:140px; height:8px; border-radius:4px; background:linear-gradient(90deg, #1FA35C 0%, #BFE6CF 100%)"></div>
+</div>
+<table style="font-size:25px; color:#3F4F47">
+<tr style="background:#0E6B3F"><th style="width:22%; color:#F2F7F4">Tiêu chí</th><th style="width:28%; color:#F2F7F4">GR00T N1.7</th><th style="width:27%; color:#F2F7F4">π0.5</th><th style="width:23%; color:#F2F7F4">OpenVLA</th></tr>
+<tr><td style="color:#123F2B">Robot hình người</td><td style="color:#123F2B">Hỗ trợ, kết hợp SONIC</td><td>Chưa hỗ trợ WBC</td><td>Chưa hỗ trợ WBC</td></tr>
+<tr style="background:#F3F8F5"><td style="color:#123F2B">Sinh hành động</td><td style="color:#123F2B">Flow matching, 40 bước</td><td>Flow matching</td><td>Token rời rạc, kém mượt</td></tr>
+<tr><td style="color:#123F2B">Suy luận nhiều bước</td><td style="color:#123F2B">Không</td><td>Có, tự sinh bước con</td><td>Không</td></tr>
+<tr style="background:#F3F8F5"><td style="color:#123F2B">Backbone</td><td style="color:#123F2B">Cosmos-Reason2, đóng băng</td><td>PaliGemma 3B, huấn luyện cùng</td><td>Llama 2 7B</td></tr>
+</table>
+<div style="display:flex; flex-direction:row; gap:32px">
+<div style="flex:1; display:flex; flex-direction:column; gap:12px; background:linear-gradient(180deg, #EEF8F2 0%, #F7FBF9 100%); border-radius:24px; padding:26px 34px">
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center">
+<div style="width:60px; height:60px; border-radius:50%; background:#D5EFE0; display:flex; align-items:center; justify-content:center"><x-icon name="ThumbsUp" style="color:#0E6B3F; width:36px; height:36px"></x-icon></div>
+<h3 style="font-size:30px; font-weight:800; color:#0E6B3F; text-transform:uppercase">Ưu điểm</h3>
+</div>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Hỗ trợ trọn vẹn robot hình người</p>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Chi phí fine-tune thấp, chỉ huấn luyện action head</p>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Sẵn công cụ triển khai: ONNX, TensorRT, Jetson</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:12px; background:#F4F5F4; border-radius:24px; padding:26px 34px">
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center">
+<div style="width:60px; height:60px; border-radius:50%; background:#E3E7E5; display:flex; align-items:center; justify-content:center"><x-icon name="Warning" style="color:#123F2B; width:36px; height:36px"></x-icon></div>
+<h3 style="font-size:30px; font-weight:800; color:#123F2B; text-transform:uppercase">Nhược điểm</h3>
+</div>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Chưa tự phân rã nhiệm vụ dài như π0.5</p>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Ít kết quả kiểm chứng khái quát ngoài thực tế</p>
+<p style="font-size:25px; line-height:1.35; color:#123F2B">Robot mới vẫn cần thu thập demo và fine-tune</p>
+</div>
+</div>
+<aside>π0.5 là mô hình gần nhất: cùng khung VLM khoảng 3 tỉ tham số và action expert dùng flow matching. Ưu điểm của GR00T: hỗ trợ robot hình người (có SONIC), fine-tune rẻ vì backbone đóng băng, công cụ triển khai đầy đủ. Nhược điểm: không có suy luận nhiều bước và ít bằng chứng khái quát ngoài thực tế. OpenVLA rời rạc hoá hành động nên chậm và kém mượt.</aside>
+</section>
