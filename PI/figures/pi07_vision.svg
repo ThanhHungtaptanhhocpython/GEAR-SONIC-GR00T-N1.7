@@ -1,0 +1,605 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 1246" width="1300" height="1246" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker></defs><rect x="0" y="0" width="1300" height="1246" fill="#ffffff"/><text x="650" y="36" font-size="21" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>π0.7 &quot;nhìn&quot; ảnh thế nào: nhớ 5 giây, nhưng chỉ tốn chỗ như 1 ảnh</tspan></text>
+<text x="650" y="60" font-size="13" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Ví dụ xuyên suốt: tay robot dần che mất lon nước. Ở khung hiện tại không còn thấy lon, nhưng mô hình vẫn phải biết lon ở đó.</tspan></text>
+<text x="650" y="82" font-size="12" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Số màu </tspan><tspan fill="#2563eb" font-weight="700">xanh ~</tspan><tspan> là suy từ cấu hình Gemma3/SigLIP; số </tspan><tspan fill="#0f172a" font-weight="700">đậm</tspan><tspan> có trong paper π0.7 hoặc MEM. Hình chỉ vẽ 1 camera; mỗi camera làm y hệt.</tspan></text>
+<rect x="40" y="100" width="1220" height="150" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="58" y="118" width="30" height="30" rx="15" fill="#0369a1" stroke="none" stroke-width="1"/>
+<text x="73" y="139" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>1</tspan></text>
+<text x="100" y="139" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Lấy một đoạn video ngắn</tspan></text>
+<text x="60" y="170" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Mỗi camera lấy 6 khung:</tspan></text>
+<text x="60" y="191" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>khung hiện tại + 5 khung trước,</tspan></text>
+<text x="60" y="212" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>cách nhau 1 s, resize 448×448.</tspan></text>
+<text x="60" y="233" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Ở t−1 và t, tay robot che mất lon.</tspan></text>
+<g transform="translate(420.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="96" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="93" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="480.0" y="228.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−5 s</tspan></text>
+<g transform="translate(560.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="84" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="81" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="620.0" y="228.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−4 s</tspan></text>
+<g transform="translate(700.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="70" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="67" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="760.0" y="228.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−3 s</tspan></text>
+<g transform="translate(840.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="56" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="53" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="900.0" y="228.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−2 s</tspan></text>
+<g transform="translate(980.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="36" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="33" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1040.0" y="228.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−1 s</tspan></text>
+<g transform="translate(1120.0,122) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="32" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="29" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1180.0" y="228.0" font-size="11.5" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t (bây giờ)</tspan></text>
+<rect x="40" y="262" width="1220" height="170" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="58" y="280" width="30" height="30" rx="15" fill="#0369a1" stroke="none" stroke-width="1"/>
+<text x="73" y="301" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>2</tspan></text>
+<text x="100" y="301" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Cắt ảnh thành ô (token)</tspan></text>
+<text x="60" y="332" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Mỗi ô (patch 14 px) là một token.</tspan></text>
+<text x="60" y="353" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Thật ra 32×32 = 1024 ô mỗi ảnh;</tspan></text>
+<text x="60" y="374" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>hình vẽ 4×4 cho dễ nhìn.</tspan></text>
+<text x="60" y="395" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Lúc này mỗi ô chỉ biết màu sắc</tspan></text>
+<text x="60" y="416" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>bên trong chính nó.</tspan></text>
+<g transform="translate(420.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="96" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="93" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="480.0" y="390.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−5 s</tspan></text>
+<g transform="translate(560.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="84" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="81" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="620.0" y="390.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−4 s</tspan></text>
+<g transform="translate(700.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="70" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="67" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="760.0" y="390.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−3 s</tspan></text>
+<g transform="translate(840.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="56" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="53" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="900.0" y="390.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−2 s</tspan></text>
+<g transform="translate(980.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="36" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="33" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1040.0" y="390.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−1 s</tspan></text>
+<g transform="translate(1120.0,284) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="32" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="29" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1180.0" y="390.0" font-size="11.5" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t (bây giờ)</tspan></text>
+<rect x="720" y="398" width="520" height="26" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+<text x="980" y="416" font-size="12" fill="#1e293b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>ô khoanh ở khung t → 1 vector </tspan><tspan fill="#2563eb" font-weight="700">1152</tspan><tspan> số. Lúc này nó chỉ thấy tay robot.</tspan></text>
+<rect x="40" y="444" width="1220" height="330" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="58" y="462" width="30" height="30" rx="15" fill="#0369a1" stroke="none" stroke-width="1"/>
+<text x="73" y="483" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>3</tspan></text>
+<text x="100" y="483" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Các ô trao đổi thông tin</tspan></text>
+<text x="60" y="514" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>SigLIP có 27 khối xếp chồng.</tspan></text>
+<text x="60" y="535" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Trong mỗi khối, các ô trao đổi</tspan></text>
+<text x="60" y="556" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>thông tin với nhau (attention).</tspan></text>
+<text x="60" y="577" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Có hai kiểu trao đổi:</tspan></text>
+<text x="60" y="598" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan></tspan></text>
+<text x="60" y="619" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A · trong cùng ảnh: ở cả 27 khối.</tspan></text>
+<text x="60" y="640" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>B · cùng vị trí qua các ảnh:</tspan></text>
+<text x="60" y="661" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>    THÊM vào cứ 4 khối một lần</tspan></text>
+<text x="60" y="682" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>    (~6 khối; các khối đó có cả A</tspan></text>
+<text x="60" y="703" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>    lẫn B). Đây là phần MEM thêm</tspan></text>
+<text x="60" y="724" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>    vào ViT gốc.</tspan></text>
+<text x="450" y="468" font-size="12" fill="#1e293b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan fill="#2563eb" font-weight="700">27</tspan><tspan> khối</tspan></text>
+<rect x="420" y="474" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="484" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="494" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="504" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="504" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="512" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="514" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="524" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="534" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="544" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="544" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="552" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="554" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="564" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="574" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="584" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="584" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="592" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="594" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="604" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="614" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="624" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="624" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="632" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="634" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="644" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="654" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="664" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="664" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="672" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="674" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="684" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="694" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="704" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="450" y="704" width="30" height="8" rx="2" fill="#fdba74" stroke="none" stroke-width="1"/>
+<text x="486" y="712" font-size="10" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A+B</tspan></text>
+<rect x="420" y="714" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="724" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<rect x="420" y="734" width="60" height="8" rx="2" fill="#93c5fd" stroke="none" stroke-width="1"/>
+<text x="450" y="760" font-size="10.5" fill="#1d4ed8" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>xanh: A (mọi khối)</tspan></text>
+<text x="450" y="774" font-size="10.5" fill="#c2410c" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>cam: thêm B</tspan></text>
+<text x="540" y="476" font-size="13.5" fill="#1d4ed8" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>A · Trong cùng một ảnh</tspan></text>
+<g transform="translate(540,490) scale(1.5)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="32" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="29" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#1d4ed8" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<line x1="607.5" y1="574.0" x2="562.5" y2="506.5" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="607.5" y2="506.5" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="652.5" y2="506.5" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="697.5" y2="506.5" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="562.5" y2="540.25" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="607.5" y2="540.25" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="652.5" y2="540.25" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="697.5" y2="540.25" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="562.5" y2="574.0" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="652.5" y2="574.0" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="697.5" y2="574.0" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="562.5" y2="607.75" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="607.5" y2="607.75" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="652.5" y2="607.75" stroke="#1d4ed8" stroke-width="1.2"/>
+<line x1="607.5" y1="574.0" x2="697.5" y2="607.75" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="540" y="654" font-size="12.5" fill="#1e293b" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Ô được khoanh hỏi mọi ô khác</tspan></text>
+<text x="540" y="672" font-size="12.5" fill="#1e293b" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>trong cùng ảnh: &quot;quanh tôi có gì?&quot;</tspan></text>
+<text x="540" y="696" font-size="12.5" fill="#475569" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>→ hiểu bố cục ảnh hiện tại,</tspan></text>
+<text x="540" y="714" font-size="12.5" fill="#475569" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>   nhưng không biết quá khứ.</tspan></text>
+<text x="790" y="476" font-size="13.5" fill="#c2410c" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>B · Cùng một vị trí, qua các ảnh</tspan></text>
+<g transform="translate(790.0,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="96" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="93" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#ea580c" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="823.6" y="638.4" font-size="11" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−5</tspan></text>
+<g transform="translate(865.2,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="84" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="81" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#ea580c" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="898.8000000000001" y="638.4" font-size="11" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−4</tspan></text>
+<g transform="translate(940.4,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="70" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="67" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#ea580c" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="974.0" y="638.4" font-size="11" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−3</tspan></text>
+<g transform="translate(1015.6,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="56" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="53" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#ea580c" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1049.2" y="638.4" font-size="11" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−2</tspan></text>
+<g transform="translate(1090.8,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="36" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="33" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#ea580c" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1124.3999999999999" y="638.4" font-size="11" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−1</tspan></text>
+<g transform="translate(1166.0,574) scale(0.56)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="32" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="29" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1199.6" y="638.4" font-size="11" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t</tspan></text>
+<path d="M815.2,599.2 C815.2,528.2 1191.2,528.2 1191.2,596.2" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#arr)"/>
+<path d="M890.4000000000001,599.2 C890.4000000000001,539.2 1191.2,539.2 1191.2,596.2" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#arr)"/>
+<path d="M965.6,599.2 C965.6,550.2 1191.2,550.2 1191.2,596.2" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#arr)"/>
+<path d="M1040.8,599.2 C1040.8,561.2 1191.2,561.2 1191.2,596.2" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#arr)"/>
+<path d="M1116.0,599.2 C1116.0,572.2 1191.2,572.2 1191.2,596.2" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="790" y="666" font-size="12.5" fill="#1e293b" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Ô ở khung t hỏi đúng vị trí đó ở các khung trước</tspan></text>
+<text x="790" y="684" font-size="12.5" fill="#1e293b" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>(chỉ nhìn quá khứ, không nhìn tương lai):</tspan></text>
+<rect x="790" y="696" width="440" height="50" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1"/>
+<text x="802" y="717" font-size="12.5" fill="#9a3412" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>&quot;Ở t−5 … t−2, chỗ tôi là một lon đỏ.&quot;</tspan></text>
+<text x="802" y="736" font-size="12.5" fill="#9a3412" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>→ ô ở khung t nhớ: dưới tay robot có lon.</tspan></text>
+<rect x="40" y="786" width="1220" height="172" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="58" y="804" width="30" height="30" rx="15" fill="#0369a1" stroke="none" stroke-width="1"/>
+<text x="73" y="825" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>4</tspan></text>
+<text x="100" y="825" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Bỏ 5 khung cũ, giữ khung t</tspan></text>
+<text x="60" y="856" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Quá khứ đã &quot;thấm&quot; vào các ô</tspan></text>
+<text x="60" y="877" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>của khung t ở bước 3, nên</tspan></text>
+<text x="60" y="898" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>bỏ token 5 khung cũ không mất</tspan></text>
+<text x="60" y="919" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>thông tin.</tspan></text>
+<g transform="translate(420.0,808) scale(1.0)" opacity="0.22">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="96" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="93" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="480.0" y="914.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−5 s</tspan></text>
+<g transform="translate(560.0,808) scale(1.0)" opacity="0.22">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="84" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="81" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="620.0" y="914.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−4 s</tspan></text>
+<g transform="translate(700.0,808) scale(1.0)" opacity="0.22">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="70" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="67" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="760.0" y="914.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−3 s</tspan></text>
+<g transform="translate(840.0,808) scale(1.0)" opacity="0.22">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="56" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="53" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="900.0" y="914.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−2 s</tspan></text>
+<g transform="translate(980.0,808) scale(1.0)" opacity="0.22">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="36" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="33" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#94a3b8" stroke-width="1"/>
+</g>
+<text x="1040.0" y="914.0" font-size="11.5" fill="#64748b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t−1 s</tspan></text>
+<g transform="translate(1120.0,808) scale(1.0)" opacity="1.0">
+<rect x="0" y="0" width="120" height="90" rx="0" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<rect x="0" y="64" width="120" height="26" rx="0" fill="#efe6d8" stroke="none" stroke-width="1"/>
+<rect x="37" y="44" width="16" height="22" rx="2" fill="#dc2626" stroke="none" stroke-width="1"/>
+<rect x="37" y="52" width="16" height="5" rx="0" fill="#ffffff" stroke="none" stroke-width="1"/>
+<rect x="32" y="0" width="22" height="58" rx="2" fill="#64748b" stroke="none" stroke-width="1"/>
+<rect x="29" y="54" width="28" height="12" rx="2" fill="#334155" stroke="none" stroke-width="1"/>
+<line x1="30" y1="0" x2="30" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="22.5" x2="120" y2="22.5" stroke="#0f172a" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="45.0" x2="120" y2="45.0" stroke="#0f172a" stroke-width="1"/>
+<line x1="90" y1="0" x2="90" y2="90" stroke="#0f172a" stroke-width="1"/>
+<line x1="0" y1="67.5" x2="120" y2="67.5" stroke="#0f172a" stroke-width="1"/>
+<rect x="31" y="46.0" width="28" height="20.5" rx="2" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="0" y="0" width="120" height="90" rx="0" fill="none" stroke="#15803d" stroke-width="4"/>
+</g>
+<text x="1180.0" y="914.0" font-size="11.5" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>t (bây giờ)</tspan></text>
+<line x1="440.0" y1="818" x2="520.0" y2="888" stroke="#dc2626" stroke-width="3"/>
+<line x1="440.0" y1="888" x2="520.0" y2="818" stroke="#dc2626" stroke-width="3"/>
+<line x1="580.0" y1="818" x2="660.0" y2="888" stroke="#dc2626" stroke-width="3"/>
+<line x1="580.0" y1="888" x2="660.0" y2="818" stroke="#dc2626" stroke-width="3"/>
+<line x1="720.0" y1="818" x2="800.0" y2="888" stroke="#dc2626" stroke-width="3"/>
+<line x1="720.0" y1="888" x2="800.0" y2="818" stroke="#dc2626" stroke-width="3"/>
+<line x1="860.0" y1="818" x2="940.0" y2="888" stroke="#dc2626" stroke-width="3"/>
+<line x1="860.0" y1="888" x2="940.0" y2="818" stroke="#dc2626" stroke-width="3"/>
+<line x1="1000.0" y1="818" x2="1080.0" y2="888" stroke="#dc2626" stroke-width="3"/>
+<line x1="1000.0" y1="888" x2="1080.0" y2="818" stroke="#dc2626" stroke-width="3"/>
+<rect x="910" y="924" width="330" height="24" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="1075" y="941" font-size="12" fill="#14532d" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>giữ lại khung t: 1024 ô, mang theo trí nhớ 5 s</tspan></text>
+<rect x="40" y="970" width="1220" height="150" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="58" y="988" width="30" height="30" rx="15" fill="#0369a1" stroke="none" stroke-width="1"/>
+<text x="73" y="1009" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>5</tspan></text>
+<text x="100" y="1009" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Gộp ô rồi đưa vào backbone</tspan></text>
+<text x="60" y="1040" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Gộp mỗi 2×2 ô thành 1 (cơ chế</tspan></text>
+<text x="60" y="1061" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>này là suy luận), rồi chiếu sang</tspan></text>
+<text x="60" y="1082" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>chiều 2560 của Gemma3 4B.</tspan></text>
+<rect x="420" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="996" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1008" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1020" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1032" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1044" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1056" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1068" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="420" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="432" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="444" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="456" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="468" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="480" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="492" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<rect x="504" y="1080" width="11" height="11" rx="1" fill="#99f6e4" stroke="none" stroke-width="1"/>
+<text x="468" y="1112" font-size="12" fill="#1e293b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan fill="#2563eb" font-weight="700">32×32</tspan><tspan> = </tspan><tspan fill="#2563eb" font-weight="700">1024</tspan><tspan> ô</tspan></text>
+<line x1="532" y1="1044" x2="592" y2="1044" stroke="#334155" stroke-width="2" marker-end="url(#arr)"/>
+<text x="562" y="1036" font-size="11.5" fill="#475569" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>gộp 2×2</tspan></text>
+<rect x="604" y="996" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="628" y="996" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="652" y="996" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="676" y="996" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="604" y="1020" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="628" y="1020" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="652" y="1020" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="676" y="1020" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="604" y="1044" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="628" y="1044" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="652" y="1044" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="676" y="1044" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="604" y="1068" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="628" y="1068" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="652" y="1068" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<rect x="676" y="1068" width="22" height="22" rx="2" fill="#2dd4bf" stroke="none" stroke-width="1"/>
+<text x="652" y="1112" font-size="12" fill="#1e293b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan fill="#2563eb" font-weight="700">16×16</tspan><tspan> = </tspan><tspan fill="#2563eb" font-weight="700">256</tspan><tspan> ô</tspan></text>
+<line x1="716" y1="1044" x2="776" y2="1044" stroke="#334155" stroke-width="2" marker-end="url(#arr)"/>
+<text x="746" y="1036" font-size="11.5" fill="#475569" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>chiếu</tspan></text>
+<rect x="788" y="1022" width="190" height="44" rx="8" fill="#ccfbf1" stroke="#0f766e" stroke-width="1"/>
+<text x="883" y="1049" font-size="13.5" fill="#1e293b" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan fill="#2563eb" font-weight="700">~256</tspan><tspan> token × </tspan><tspan fill="#2563eb" font-weight="700">2560</tspan></text>
+<line x1="984" y1="1044" x2="1038" y2="1044" stroke="#334155" stroke-width="2" marker-end="url(#arr)"/>
+<rect x="1044" y="1014" width="170" height="60" rx="10" fill="#f0f9ff" stroke="#0369a1" stroke-width="1.5"/>
+<text x="1129" y="1040" font-size="13.5" fill="#0f172a" font-weight="700" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Backbone</tspan></text>
+<text x="1129" y="1059" font-size="12.5" fill="#334155" font-weight="normal" text-anchor="middle" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Gemma3 4B</tspan></text>
+<rect x="40" y="1134" width="1220" height="96" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+<text x="60" y="1162" font-size="15" fill="#14532d" font-weight="700" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Kết quả cho mỗi camera</tspan></text>
+<text x="60" y="1186" font-size="13" fill="#1e293b" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Đưa thẳng 6 ảnh vào backbone: 6 × </tspan><tspan fill="#2563eb" font-weight="700">256</tspan><tspan> = </tspan><tspan fill="#2563eb" font-weight="700">1536</tspan><tspan> token.   Qua MEM: vẫn </tspan><tspan fill="#2563eb" font-weight="700">~256</tspan><tspan> token như 1 ảnh, nhưng các token này biết cả 5 giây vừa qua.</tspan></text>
+<text x="60" y="1210" font-size="13" fill="#334155" font-weight="normal" text-anchor="start" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif"><tspan>Có tối đa </tspan><tspan fill="#0f172a" font-weight="700">4</tspan><tspan> camera, mỗi camera làm y hệt. Ảnh subgoal đi qua cùng bộ mã hoá như &quot;video 1 khung&quot;: không có kiểu B, không có bước 4.</tspan></text></svg>

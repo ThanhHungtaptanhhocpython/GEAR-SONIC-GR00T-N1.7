@@ -280,7 +280,7 @@ if pub_url and ":" in pub_url:
     print(f"🎉 Đường hầm TCP: tcp://{pub_url} (mở lúc {time.strftime('%H:%M')}, hết hạn khoảng {time.strftime('%H:%M', time.localtime(time.time() + 3600))})")
     print("=" * 75)
     print("👉 ĐÁNH GIÁ CLOSED-LOOP (terminal máy local):")
-    print(f".venv/bin/python tools/eval_closed_loop.py --host {host} --port {port} --dataset datasets/g1_can_sort_ik_test --out eval/<tên>")
+    print(f".venv/bin/python tools/eval_closed_loop.py --host {host} --port {port} --dataset datasets/g1_can_sort_bal_test --out eval/<tên> --seconds 20 --stop-on-success")
     print("👉 XEM TRỰC QUAN TRONG GUI:")
     print(f".venv/bin/python launch_vla_simulation.py --policy-mode remote --server-host {host} --server-port {port} --server-timeout-ms 10000")
     print("   Với checkpoint fine-tune từ dataset collect_demos.py (ghi ở 25 Hz), thêm: --vla-action-hz 25")
@@ -345,6 +345,7 @@ rồi tải `datasets/g1_can_sort_ik.zip` lên thư mục `gr00t` trong Google D
 
 ### Lưu ý
 * Checkpoint trong lúc train lưu ở ổ đĩa tạm `/content/outputs`, và `finetune.sh` chỉ giữ 5 checkpoint gần nhất (`--save_total_limit 5`). Bước 8a chép từng checkpoint về Drive ngay khi ghi xong, nên không mất khi runtime bị ngắt hoặc khi checkpoint cũ bị xoá. Bước 11 đánh giá mọi checkpoint và chỉ ra checkpoint tốt nhất.
+* Train tiếp từ một checkpoint (ví dụ runtime bị ngắt giữa chừng): đặt `INIT_FROM` ở Bước 4 và `MAX_STEPS` = số bước còn thiếu. Chỉ nạp trọng số (không phải resume), checkpoint mới lưu vào thư mục riêng `<DATASET_NAME>_from<N>`.
 * Isaac-GR00T được ghim ở commit `{ISAAC_COMMIT[:7]}`.
 """),
         GPU_CELL,
@@ -361,6 +362,13 @@ DRIVE_DIR = "/content/drive/MyDrive/gr00t"
 # Checkpoint lưu theo tên này: MyDrive/gr00t/checkpoints/<DATASET_NAME>/checkpoint-*
 DATASET_NAME = "g1_can_sort_bal"            # checkpoint C; A: "g1_can_sort_ik", B: "g1_can_sort_swap_hold"
 TEST_DATASET_NAME = "g1_can_sort_bal_test"  # tập test cho Bước 11
+# Trọng số khởi tạo: "" = base nvidia/GR00T-N1.7-3B. Đặt đường dẫn một checkpoint để train tiếp từ trọng số của nó, ví dụ
+#   INIT_FROM = f"{DRIVE_DIR}/checkpoints/g1_can_sort_bal/checkpoint-4000"
+# Đây KHÔNG phải resume: checkpoint lưu --save-only-model nên không có trạng thái optimizer/scheduler. Số bước đếm lại từ 0,
+# LR warmup lại lên 1e-4 rồi chạy cosine trong MAX_STEPS bước mới, nên đặt MAX_STEPS = số bước còn thiếu. Checkpoint mới
+# lưu vào thư mục riêng <DATASET_NAME>_from<N> (không trùng tên checkpoint của lượt trước), chép và đánh giá từ bước 0.
+# Nạp checkpoint từ Drive chậm (~10 phút ở "Loading checkpoint shards").
+INIT_FROM = ""
 os.environ.update({
     "DATASET_ZIP": f"{DRIVE_DIR}/{DATASET_NAME}.zip",
     "DATASET_DIR": f"/content/datasets/{DATASET_NAME}",
@@ -381,8 +389,29 @@ os.environ.update({
     "EVAL_FROM_STEP": "5000",
     "DATALOADER_NUM_WORKERS": "4",
     "USE_WANDB": "0",
+    "BASE_MODEL_PATH": "nvidia/GR00T-N1.7-3B",
 })
 assert os.path.exists(os.environ["DATASET_ZIP"]), f"Không thấy {os.environ['DATASET_ZIP']} trên Drive."
+if INIT_FROM:
+    import glob, re
+    INIT_FROM = INIT_FROM.rstrip("/")
+    assert os.path.exists(f"{INIT_FROM}/config.json"), f"Không thấy checkpoint {INIT_FROM} (thiếu config.json)."
+    m = re.search(r"checkpoint-(\\d+)$", INIT_FROM)
+    os.environ.update({
+        "BASE_MODEL_PATH": INIT_FROM,
+        "EXPERIMENT": f"{DATASET_NAME}_from{m.group(1) if m else os.path.basename(INIT_FROM)}",
+        "SYNC_FROM_STEP": "0",
+        "EVAL_FROM_STEP": "0",
+    })
+    existing = glob.glob(f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}/checkpoint-*")
+    if existing:
+        print(f"⚠️ Drive đã có {len(existing)} checkpoint trong {os.environ['EXPERIMENT']}: Bước 8a sẽ bỏ qua checkpoint "
+              "trùng tên. Xoá hoặc đổi tên thư mục đó nếu là của lượt khác.")
+print(f"Khởi tạo từ: {os.environ['BASE_MODEL_PATH']}")
+print(f"Checkpoint lưu vào: {os.environ['OUTPUT_DIR']}/{os.environ['EXPERIMENT']} -> "
+      f"{os.environ['DRIVE_CKPT_DIR']}/{os.environ['EXPERIMENT']}")
+print(f"Batch {os.environ['GLOBAL_BATCH_SIZE']} × {os.environ['MAX_STEPS']} bước, chép/đánh giá từ bước "
+      f"{os.environ['SYNC_FROM_STEP']}/{os.environ['EVAL_FROM_STEP']}")
 print("✅ Đã mount Drive và đặt cấu hình.")
 """),
         code("""
@@ -472,7 +501,7 @@ TRAIN_LOG = f"{os.environ['OUTPUT_DIR']}/train.log"
 assert "train_proc" not in globals() or train_proc.poll() is not None, "Train đang chạy; xem Bước 8b."
 train_cmd = f\"\"\"
 cd /content/Isaac-GR00T && source .venv/bin/activate && bash examples/finetune.sh \\\\
-    --base-model-path nvidia/GR00T-N1.7-3B \\\\
+    --base-model-path "$BASE_MODEL_PATH" \\\\
     --dataset-path "$DATASET_DIR" \\\\
     --embodiment-tag NEW_EMBODIMENT \\\\
     --modality-config-path "$MODALITY_CONFIG" \\\\

@@ -11,6 +11,9 @@ Tích hợp:
       [F10]   : Đặt lại (Reset) robot và lon nước về vị trí ban đầu (cảnh ngẫu nhiên hiện tại nếu có)
       [F11]   : Cảnh ngẫu nhiên kế tiếp (seed + 1, hoặc episode kế tiếp của --scene-dataset)
       [F12]   : Chụp và lưu ảnh snapshot từ camera ego_view & front_camera
+      [Insert]: (hoặc 0/Ins ở cụm phím số) Đổi màu hai lon cho nhau (lon Coca thành xanh, lon Pepsi thành đỏ; vị trí
+                và khay giữ nguyên), bấm lần
+                nữa để trả lại. Dùng để thử model có nhìn màu lon không: gắp Coca mà tay đi theo lon đỏ là có nhìn màu
   Viewer MuJoCo đã dùng mọi chữ cái (và 0-9, F1-F7) làm phím tắt hiển thị: trước đây 1 / 2 / N / R / S của launcher
   đồng thời ẩn mesh robot (geom group 2), tô màu constraint island, tắt phản chiếu / bóng. Nên dùng F8-F12.
       [ESC]   : Thoát chương trình
@@ -19,6 +22,7 @@ Mặc định lon ở vị trí cố định trong scene XML. Muốn đặt cả
   --scene-seed N                        : lấy mẫu vị trí/hướng lon, khay đích, nhiễu khớp tay theo seed N
                                           (--swap-prob, --lying-prob chỉnh cách lấy mẫu)
   --scene-dataset DIR --scene-episode K : dựng lại đúng cảnh của episode K trong dataset (kể cả nhiệm vụ)
+  --swap-can-colors                     : khởi động với màu hai lon đã đổi cho nhau (như bấm Insert)
 
 --lower-body balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều khiển chân + eo (robot tự đứng vững,
 ngả ~2-3° thay vì 5-11° khi vươn tay); mặc định fixed: chân khoá cứng như lúc thu demo.
@@ -47,6 +51,12 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+# Phiên Wayland: mở cửa sổ viewer qua XWayland (bản X11 của GLFW). Đã thử trên X11: Insert (260) và 0/Ins cụm phím số
+# (320) tới được key_callback và màu lon đổi trên cửa sổ; với Wayland gốc thì chưa kiểm chứng được và người dùng bấm
+# Insert không thấy đổi màu. Đặt PYGLFW_LIBRARY_VARIANT=wayland để dùng lại Wayland gốc. Phải đặt trước khi nạp glfw.
+if os.environ.get("XDG_SESSION_TYPE") == "wayland" and os.environ.get("DISPLAY"):
+    os.environ.setdefault("PYGLFW_LIBRARY_VARIANT", "x11")
+
 import mujoco
 import mujoco.viewer
 from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
@@ -63,6 +73,8 @@ TASK_OF_KEY = {"1": "coke", "2": "pepsi"}
 
 # Mã phím GLFW mà key_callback của viewer nhận được (F1-F7 viewer đã dùng)
 KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12 = 297, 298, 299, 300, 301
+# Insert: phím Insert riêng (260) hoặc phím 0/Ins ở cụm phím số; GLFW báo phím này là KP_0 (320) dù NumLock bật hay tắt
+KEY_INSERT = (260, 320)
 
 # --stop-on-success: sau khi lon nằm trong khay và đã nhả, chờ cổ tay rút ra xa lon thêm RETREAT_CLEAR_M so với lúc nhả
 # (hoặc tối đa DONE_WAIT_STEPS bước 50 Hz) rồi mới về ready và giữ, để tay rút khỏi khay theo quỹ đạo của model thay vì
@@ -233,6 +245,8 @@ def main():
                         help="Với --scene-seed: xác suất hai lon đổi phía (như collect_demos.py)")
     parser.add_argument("--lying-prob", type=float, default=0.5,
                         help="Với --scene-seed: xác suất mỗi lon nằm")
+    parser.add_argument("--swap-can-colors", action="store_true",
+                        help="Khởi động với màu hai lon đổi cho nhau (lon Coca xanh, lon Pepsi đỏ); bấm Insert để đổi lại")
     parser.add_argument(
         "--wbc-mode",
         type=str,
@@ -241,7 +255,7 @@ def main():
         help="Chế độ giải mã WBC: kinematic (đứng vững & gắp lon ổn định, mặc định) hoặc onnx (mạng nơ-ron GEAR-SONIC).",
     )
     parser.add_argument("--debug-keys", action="store_true",
-                        help="In mã phím mà viewer chuyển cho script (F8-F12 phải ra 297-301), để kiểm tra phím F")
+                        help="In mã phím mà viewer chuyển cho script (F8-F12 phải ra 297-301, Insert 260 hoặc 320), để kiểm tra phím")
     parser.add_argument("--lower-body", choices=["fixed", "balance"], default=None,
                         help="fixed: chân khoá cứng; balance: policy thăng bằng của NVIDIA GR00T-WholeBodyControl điều "
                              "khiển chân + eo (bridge/lower_body_policy.py). Mặc định: theo cfg của episode khi dùng "
@@ -329,6 +343,9 @@ def main():
         print(f"\n🎲 Cảnh {scenes.describe(current_task)}")
 
     apply_scene()
+    if args.swap_can_colors:
+        pipeline.sim.set_can_colors_swapped(True)
+        print("\n🎨 Màu hai lon đã đổi cho nhau: lon Coca màu xanh, lon Pepsi màu đỏ (Insert để đổi lại)")
 
     print("\n🎮 PHÍM NÓNG ĐIỀU KHIỂN TRONG CỬA SỔ 3D:")
     print("  [F8]    : Chuyển sang nhiệm vụ 'Gắp lon Coca-Cola sang khay đỏ' (Dùng tay phải)")
@@ -338,6 +355,7 @@ def main():
     if scenes is not None:
         print("  [F11]   : Cảnh ngẫu nhiên kế tiếp")
     print("  [F12]   : Chụp và lưu ảnh snapshot từ camera robot vào ./snapshots/")
+    print("  [Insert]: Đổi màu hai lon cho nhau / trả lại (thử model có nhìn màu lon không); 0/Ins ở cụm phím số cũng được")
     if args.stop_on_success:
         print("  (Đặt xong lon thì robot giữ tư thế ready, chờ F10 / F11 / F8 / F9; tắt bằng --no-stop-on-success)")
     print("  Các chữ cái và phím số là phím tắt hiển thị của viewer MuJoCo (ví dụ 2 ẩn robot, N tô màu island)")
@@ -349,10 +367,12 @@ def main():
     reset_requested = False
     next_scene_requested = False
     snapshot_requested = False
+    swap_colors_requested = False
 
     # Hàm callback xử lý phím bấm trong cửa sổ MuJoCo 3D Viewer (Chạy trên GLFW GUI thread)
     def key_callback(keycode: int):
         nonlocal pending_prompt, reset_requested, snapshot_requested, next_scene_requested, current_task
+        nonlocal swap_colors_requested
         if args.debug_keys:
             print(f"[phím] keycode = {keycode}")
         if keycode == KEY_F8:
@@ -377,6 +397,8 @@ def main():
             reset_requested = True
         elif keycode == KEY_F12:
             snapshot_requested = True
+        elif keycode in KEY_INSERT:
+            swap_colors_requested = True
 
     model = pipeline.sim.model
     data = pipeline.sim.data
@@ -423,6 +445,14 @@ def main():
                 if snapshot_requested:
                     snapshot_requested = False
                     save_snapshots(pipeline.sim)
+
+                if swap_colors_requested:
+                    swap_colors_requested = False
+                    with viewer.lock():
+                        pipeline.sim.set_can_colors_swapped(not pipeline.sim.can_colors_swapped)
+                    state = ("ĐÃ ĐỔI: lon Coca màu xanh, lon Pepsi màu đỏ" if pipeline.sim.can_colors_swapped
+                             else "màu gốc: lon Coca đỏ, lon Pepsi xanh")
+                    print(f"\n🎨 [Insert] Màu lon {state}. Nhiệm vụ vẫn là '{pipeline.task_prompt}'")
 
                 # Bước 1 chu kỳ 50 Hz (20 ms)
                 res = pipeline.step_50hz(physics_lock=viewer.lock)
