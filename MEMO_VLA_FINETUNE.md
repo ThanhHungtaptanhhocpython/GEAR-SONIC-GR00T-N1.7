@@ -5,6 +5,9 @@ Ghi lại các quyết định, phát hiện và trạng thái công việc tron
 - 23–24/09: chạy closed-loop checkpoint pilot (mục 5.1), đo biên dư kẹp (mục 4.3), sinh dataset IK (mục 4.4),
   công cụ đánh giá closed-loop (mục 5.2), tham số hoá notebook fine-tune, lập plan mở rộng vùng gắp (mục 6).
 - 24/09 (tiếp): lon đổi phía, gắp chéo người bằng `waist_yaw` (mục 4.5).
+- 29/09: đọc paper π0.7, ghi các ý áp dụng cho dự án (mục 6b; tóm tắt ở `PI/PAPER_PI07_VI.md`).
+- 29/09: tổng hợp các VLA cho humanoid có dùng WBC (GR00T Decoupled WBC / SONIC, Ψ₀, WholeBodyVLA, LeVERB, ω-0, HAF…):
+  [`docs/SURVEY_VLA_WBC.md`](docs/SURVEY_VLA_WBC.md).
 
 Nhánh `feat/smooth-vla-trajectory`. Các commit:
 - `1579e2c`: đường ống GR00T thật, IK demo, công cụ fine-tune.
@@ -84,6 +87,10 @@ Notebook mới đọc token từ Colab Secrets (`HF_TOKEN`). Tới 24/09 chưa g
     action trước (290), trọng lực (30); ra 29 action. Khớp với cách `SonicWBCController.decode` đang dựng.
   - `planner_sonic.onnx` (sinh chuyển động đi): vào `context_mujoco_qpos [1,4,36]`, `target_vel`, `mode`, `movement_direction`,
     `facing_direction`, `height`, `specific_target_positions/headings`…; ra `mujoco_qpos [1,64,36]` (64 khung qpos toàn thân).
+- 27/09: đã đọc code NVIDIA (`third_party/GR00T-WholeBodyControl` clone đủ + LFS, `third_party/Isaac-GR00T` @ `51d4c89`).
+  Chế độ `onnx` của `SonicWBCController` dựng quan sát khác NVIDIA (thứ tự khớp MuJoCo thay vì IsaacLab, tư thế gốc chân
+  thẳng thay vì `default_angles`, scale 0.25 chung, kẹp chân, PD kp=500). So sánh đầy đủ và kế hoạch 6 phase:
+  [`docs/PLAN_SONIC_INTEGRATION.md`](docs/PLAN_SONIC_INTEGRATION.md).
 - Kết luận: nguồn chính là **demo sim tự sinh** (không cần robot thật), lúc đầu từ quỹ đạo mẫu, nay bằng IK online (mục 4.2).
 
 ---
@@ -1128,6 +1135,208 @@ so với `eval/B9000_{ik,swap}_test_20s_stop`. Cùng 40 cảnh mỗi tập, châ
     nguyên nhân. Chỉ dùng khi thiếu thời gian GPU (mốc 3000; hết VRAM thì 112 × 7 600 hoặc 96 × 8 900, mốc 4000), và ghi rõ khi
     so kết quả.
 
+### 5.2u. `eval_closed_loop`: bảng theo nhóm, episode "đã xong" tách riêng; lon nằm tự lăn (26/09)
+- Trước đây bảng chỉ có lon × đứng/nằm và lon × cùng/đổi phía, không có bảng chéo. Script cũng không biết episode "đã xong"
+  (4/44 trong `g1_can_sort_bal_test`). Với `--stop-on-success`, các episode này dừng ngay ở bước đầu và luôn được tính thành
+  công, nên tỉ lệ ở dòng "tất cả" bị đẩy lên.
+- Sửa `tools/eval_closed_loop.py`:
+  - Mỗi kết quả ghi thêm `done` và `group` (`collect_demos.scene_group`).
+  - Bảng gồm các khối: tất cả | 4 nhóm `GROUPS` | cùng/đổi phía | đứng/nằm | theo lon | lon × nhóm. Tập không có ca đổi phía
+    thì chỉ có đứng/nằm, như trước.
+  - Episode "đã xong" chạy đủ `--seconds` (không dừng sớm), có dòng riêng "Đã xong sẵn … giữ nguyên" và không tính vào
+    "tất cả". Lý do thất bại riêng: lấy lon ra khỏi khay / xô lon còn lại / vẫn cầm lon.
+  - `--summarize-only --out DIR [--dataset DS]`: tính lại bảng từ `results.jsonl`, ghi ra `summary_regrouped.txt`
+    (`summary.txt` của lượt chạy giữ nguyên). Kết quả cũ không có `group` thì lấy
+    nhóm từ cfg trong `collection.jsonl` của `--dataset`. `--resume` cũng làm việc này.
+  - Chạy thử `--summarize-only` trên bản sao `A10000_swap_test_20s_stop` và `B9000_ik_test_20s_stop`: số liệu khớp bản cũ.
+    Chạy với server giả (giữ nguyên tư thế) trên 44 episode `g1_can_sort_bal_test`: bảng và dòng "đã xong" đúng.
+    `verify_pipeline.py` 5/5.
+  - Notebook server (Bước 6) in sẵn lệnh eval với `g1_can_sort_bal_test --seconds 20 --stop-on-success`.
+- **Lon nằm tự lăn trên bàn (lỗi đo):**
+  - Với server giả, robot đứng yên, không chạm lon (chỉ có tiếp xúc lon–bàn). Chạy chỉ vật lý (`mj_step`) cũng cho cùng quỹ
+    đạo lăn.
+  - Lon còn lại nằm (15/44 cảnh) lệch trung vị 0.3 cm sau 5 s, 1.0 cm sau 10 s, **3.1 cm sau 20 s (max 7.1; 8/15 ≥ 3 cm)**.
+    Lon đứng: ≤ 0.1 cm.
+  - Hệ quả ở lượt 20 s: lon còn lại lệch ≥ 3 cm bị tính là "xô lon còn lại" dù robot không chạm. Lúc thu demo không bị, vì
+    demo dài ≈ 9.3 s và episode "đã xong" chỉ 4 s.
+  - Kết quả cũ: với `--stop-on-success`, phần lớn ca thành công dừng trước 10 s, nên tỉ lệ thành công gần như không đổi. Trong
+    6 lượt A/B 20 s chỉ có 1 ca đặt đúng khay mà bị tính trượt vì lon nằm lệch 4.8 cm (B9000 swap balance). Số ca ghi lý do
+    "xô lon còn lại" thì có thể bị thổi lên (A10000 swap: 9/20 ca có lon còn lại nằm).
+  - Với C: dòng "đã xong sẵn" (chạy đủ 20 s) và các ca đặt xong muộn (> 10 s) bị ảnh hưởng. **Chưa sửa:** chờ quyết định cách
+    chấm (xem mục 7).
+
+### 5.2v. Train C bị ngắt ở bước 4000; notebook thêm `INIT_FROM` để train tiếp từ checkpoint (26/09)
+- Lượt train C đầu trên G4 dùng **batch 128 × 6 700** (phương án dự phòng ở 5.2t, `SYNC/EVAL_FROM_STEP` 3000), không phải
+  80 × 10 700. Runtime ngắt sau bước 4000; trên Drive còn `g1_can_sort_bal/checkpoint-3000` và `checkpoint-4000`.
+- Hai lần thử train tiếp (người dùng sửa tay Bước 8):
+  - `colab_gr00t_finetune (1).ipynb`: `--base-model-path .../checkpoint-3000`, `MAX_STEPS` 6700. Có train (bước 252/6700,
+    loss 0.0139), nhưng là lượt mới: đếm bước lại từ 0, AdamW mất moment, LR warmup lại lên 1e-4 (ở bước 3000 của lượt đầu
+    LR ≈ 6.3e-5), tổng 9 700 bước. Checkpoint ghi vào cùng `EXPERIMENT` nên Bước 8a bỏ qua 3000/4000 mới (trùng tên trên Drive).
+  - `colab_gr00t_finetune (2).ipynb`: `finetune.sh` thoát ngay, `Unknown argument: ----base-model-path` (thừa 2 gạch).
+    Đường dẫn cũng là `".../checkpoints/..."`, do chép từ câu trả lời viết tắt; sửa gạch xong vẫn lỗi.
+- Resume thật không được: checkpoint lưu `--save-only-model` (không có optimizer/scheduler/RNG), và Isaac-GR00T từ chối
+  `save_only_model` + `resume_from_checkpoint` (`training_config.py:171`).
+- Sửa `tools/build_colab_notebooks.py` (sinh lại `colab_gr00t_finetune.ipynb`):
+  - Bước 4: `INIT_FROM = ""` (base). Đặt đường dẫn checkpoint thì `BASE_MODEL_PATH` = checkpoint đó, `EXPERIMENT` =
+    `<DATASET_NAME>_from<N>`, `SYNC_FROM_STEP`/`EVAL_FROM_STEP` = 0. Kiểm tra có `config.json`, cảnh báo nếu thư mục Drive
+    mới đã có checkpoint; in model khởi tạo, thư mục lưu, batch × bước.
+  - Bước 8: `--base-model-path "$BASE_MODEL_PATH"`.
+  - Đã thử cell Bước 4 với Drive giả (base, checkpoint có `/` cuối, checkpoint không tồn tại, thư mục mới đã có checkpoint)
+    và `finetune.sh` với `python` giả: nhận đúng `--base_model_path`. `verify_pipeline.py` đạt.
+- Để train tiếp C: `INIT_FROM = f"{DRIVE_DIR}/checkpoints/g1_can_sort_bal/checkpoint-4000"`, batch 128, `MAX_STEPS` 2700.
+  Kết quả không tương đương một lượt 6 700 bước liền; khi so với B ghi rõ "C = 128 × 4000 + 128 × 2700 (warmup lại)".
+- Lần chạy đầu với notebook mới: train thoát mã 1 sau khoảng 1–2 phút. Không lấy được log nên chưa rõ nguyên nhân.
+- **Chạy lại được, người dùng chọn `INIT_FROM` = `checkpoint-3000`, `MAX_STEPS` 3700** (warmup 185 bước), tức
+  `g1_can_sort_bal_from3000`, tổng 3000 + 3700 = 6700. Biểu đồ Bước 8d tới bước 1200:
+  - loss khởi đầu ≈ 0.010 (lượt đầu ở bước 3960 là 0.0084);
+  - loss tăng lên ≈ 0.019 ở bước 200, đúng lúc warmup xong, rồi giảm dần, về 0.0107 ở bước 1200;
+  - grad norm 0.3 → 0.8 (bước 200) → 0.4–0.5, không có gai; LR 8.1e-5 ở bước 1200.
+  - Loss nhô lên là do AdamW mất moment và LR lên 1e-4, cao gấp khoảng 1.6 lần LR của lượt đầu ở bước 3000 (≈ 6.3e-5).
+    Không phải phân kỳ, nhưng tốn khoảng 1200 bước để về lại mức ban đầu.
+  - Cần so MAE test của checkpoint cuối `from3000` với `g1_can_sort_bal/checkpoint-4000` của lượt đầu (Bước 11 chỉ đánh giá
+    thư mục `from3000`).
+- **Open-loop Bước 11 (`g1_can_sort_bal_from3000`, 44 episode `g1_can_sort_bal_test`, 40 episode train):**
+
+  | checkpoint (bước tổng) | MSE test | MAE test | MAE lớn nhất |
+  |---|---|---|---|
+  | 1000 (4000) | 0.002641 | 0.02023 | 0.03947 |
+  | 2000 (5000) | 0.001719 | 0.01482 | 0.03285 |
+  | 3000 (6000) | 0.001619 | 0.01175 | 0.03132 |
+  | **3700 (6700)** | 0.001594 | **0.01099** | 0.03013 |
+
+  Bảng chi tiết của 3700, MAE train → test:
+
+  | nhóm | train | test | test/train |
+  |---|---|---|---|
+  | cả hai | 0.00804 | 0.01099 | 1.37 |
+  | Coca / Pepsi | 0.00831 / 0.00777 | 0.01089 / 0.01110 | |
+  | đứng (24 / 24) | 0.00699 | 0.00812 | 1.16 |
+  | nằm (16 / 20) | 0.00961 | 0.01445 | 1.50 |
+  | cùng phía (21 / 22) | 0.00716 | 0.00979 | 1.37 |
+  | đổi phía (19 / 22) | 0.00900 | 0.01219 | 1.35 |
+
+  Episode test sai nhiều nhất: 17 (Pepsi, nằm, đổi phía, 0.0301), 36 (Coca, nằm, 0.0276), 15 (Pepsi, nằm, đổi phía, 0.0220).
+- Nhận xét:
+  - MAE test giảm đều tới checkpoint cuối, nhưng chậm lại (−6.5% trong 700 bước cuối, LR về 0), nên chưa overfit trên test.
+    Checkpoint 1000 (0.0202) kém vì loss nhô lên sau khi warmup lại.
+  - Khoảng cách train–test 37%, lớn hơn B-7000 (18%) và A-10000 (27%). Phần lớn nằm ở lon nằm (test/train 1.50; lon đứng
+    1.16). Test nằm/đứng 1.78 lần (B-7000: 1.22 lần). Có thể do mức sàn đa kiểu gắp của lon nằm (5.0e); cần xem 17, 36, 15
+    có nằm gần ranh giới kiểu gắp không.
+  - Đổi/cùng phía tỉ lệ test/train như nhau (1.35 / 1.37): đổi phía không phải vấn đề tổng quát hoá.
+  - Không so trực tiếp với B được: tập test khác (`bal_test` có thêm 4 episode "đã xong" đứng yên, dễ đoán).
+  - Chưa so với checkpoint-4000 của lượt đầu, nên chưa biết lượt train tiếp có giúp không. Đánh giá closed-loop là thước đo quyết định.
+- Closed-loop `eval/C3700_bal_test_20s_stop` (đang chạy, 23/44 lúc xem): hai episode "đã xong" seed 100006 (ep 10/11) bị tính
+  trượt với lý do "đã xong sẵn nhưng xô lon còn lại" (lon còn lại lệch 7.1 / 4.0 cm), dù `attempts` 0 và lon nhiệm vụ không đổi.
+  Chạy lại hai cảnh, khoá robot đứng yên, chỉ `mj_step` 20 s: lon còn lại (nằm) lệch đúng **7.1 / 4.0 cm** (0.2 cm ở 2.7 s,
+  1–1.8 cm ở 10 s), và chỉ chạm `work_table`. Kết luận: đây là lỗi đo do lon nằm tự lăn (5.2u), không phải lỗi của VLA.
+  - `coke 100001` (đổi phía nằm, thành công lúc 10 s) có lon còn lại nằm lệch đúng 3.0 cm, sát ngưỡng.
+  - `pepsi 100008` "đặt đúng khay nhưng xô lon còn lại" 6.2 cm: lon còn lại **đứng**, không tự lăn, nên nhiều khả năng robot xô thật.
+- **Sửa cách chấm "xô lon còn lại" (`tools/eval_closed_loop.py`, 26/09):** lon còn lại chỉ bị coi là bị xô khi lệch
+  ≥ 3 cm **tính từ lần đầu robot hoặc lon nhiệm vụ chạm nó** (`OtherCanContact`, kiểm tra va chạm mỗi bước 50 Hz).
+  - Chỉ thêm điều kiện "có chạm" thì chưa đủ. Thử với server giả (robot đứng yên) trên `coke 100001` (hai lon nằm): lon
+    còn lại tự lăn 5.5 cm rồi lăn vào ngón tay phải đang đứng yên ở giây 18.9, bị tính là xô. Đo từ lần chạm đầu thì
+    chỉ còn 0.2 cm.
+  - `ok` và `t_success` dùng `is_success(check_other=False)` cộng với điều kiện trên. `collect_demos.is_success` giữ
+    nguyên, vì dùng để lọc demo.
+  - `results.jsonl` ghi thêm `other_touch_steps`, `other_moved_after_touch_cm`, `other_lying`. Kết quả cũ không có các
+    trường này thì vẫn chấm theo độ lệch như trước.
+  - `--resume --rerun-rolling --dataset DS`: chạy lại các kết quả cũ có thể bị chấm nhầm (episode "đã xong", và ca thất bại
+    có lon còn lại nằm lệch ≥ 3 cm). Bản cũ lưu ở `results.before_rerun.jsonl`.
+  - Đã thử: server giả trên ep 0/2/10/11 (đã xong 2/2; coke 100001 "không khép tay" thay vì "xô"). Đẩy lon nhiệm vụ vào lon
+    còn lại bằng lực 15 N: phát hiện là xô; lực 0: không. `--rerun-rolling` trên bản sao 36 kết quả C3700: chạy lại đúng 2
+    ep seed 100006, chạy lại lần hai: 0 ep. `--summarize-only` trên kết quả cũ không đổi. `verify_pipeline.py` đạt.
+  - Hạn chế: lon lăn tới chạm tay rồi tiếp tục lăn thêm ≥ 3 cm vẫn bị tính là xô. Nếu robot xô rất nhẹ mà lon chỉ lệch
+    < 3 cm sau lần chạm đầu thì không bị tính.
+- Trùng lặp train/test của `g1_can_sort_bal(_test)`: seed train 0–366, test 100000–100048, không trùng seed; cfg giống hệt.
+  Với mỗi episode test (bỏ "đã xong"), lấy episode train cùng lon và cùng nhóm gần nhất: lon cần gắp lệch trung vị 1.3 cm
+  (17/40 lệch < 1 cm, 30/40 lệch < 2 cm), yaw lon nằm lệch trung vị 8°, lon còn lại lệch trung vị 6.2 cm. Có cảnh gần như
+  trùng (test 0/1 và train 268/285: lệch 0.2 cm, lon còn lại 0.3 cm). Ba episode sai nhiều nhất 36 / 17 / 15 có láng giềng
+  xa hơn trung vị (2.8 / 1.9 / 2.5 cm).
+
+### 5.2w. Kiểm tra model có phân biệt Coca/Pepsi bằng màu không (26/09, code xong, chưa chạy với model thật)
+- **Câu hỏi:** backbone (Cosmos-Reason2, đóng băng) có thấy màu không, và policy có dùng màu không. A cho thấy policy có thể
+  bỏ qua màu (0/26 ca đổi phía, mục 5.2l). Tỉ lệ thành công gộp lỗi chọn lon với lỗi gắp, nên cần chỉ số riêng.
+- `eval_closed_loop.py`:
+  - Trường `chose_target`: lần khép tay đầu tiên, bàn tay của nhiệm vụ gần lon nhiệm vụ hơn lon còn lại. Có thêm
+    `other_dist_at_close_cm` và cột "chọn đúng lon" trong bảng. Chỉ ca **đổi phía** mới cho biết model có nhìn màu (ca cùng
+    phía, đi theo vị trí vẫn chọn đúng). Kết quả cũ không có trường này, cần chạy lại.
+  - Đã thử rồi bỏ `--image-transform` ở client. `swap_rb` tráo kênh đỏ/xanh dương của cả ảnh, nên khay, sàn và mọi vật
+    khác cũng đổi màu; `gray` chuyển ảnh sang ảnh xám. Cả hai làm ảnh khác ảnh lúc train, nên model đi nhầm thì không tách
+    được do nó nhìn màu lon hay do ảnh lạ. Ở ảnh xám, lon đỏ vẫn sáng hơn lon xanh (độ sáng 0.33 so với 0.26), và ở ca đổi
+    phía, model đoán mò hay model đi theo vị trí đều cho tỉ lệ chọn đúng thấp. `--swap-can-colors` thay thế cả hai.
+- Lon trong sim là hình trụ trơn, **không có logo**; ngoài vị trí thì màu là dấu hiệu duy nhất.
+- **Đổi màu lon thật trong sim** (chỉ thân lon đổi màu, khay và nền giữ nguyên):
+  - `G1SortingSim.set_can_colors_swapped(bool)`: tráo `geom_matid` của `coke_body` và `pepsi_body` (nắp giữ nguyên). Chỉ
+    đổi model nên giữ qua reset.
+  - GUI: phím **Insert** (GLFW 260) bật/tắt, `--swap-can-colors` để khởi động với màu đã đổi.
+  - Eval: `--swap-can-colors`. Trường `can_colors_swapped` được ghi vào kết quả. `--resume` từ chối trộn kết quả màu gốc
+    với kết quả màu đổi trong cùng `--out`.
+  - Ở cảnh đổi phía, đổi màu làm cảnh **trông như cảnh cùng phía** (lon đỏ về bên phải). Model nhìn màu sẽ tự tin đi về
+    lon bên mình, tức lon sai.
+- Đã thử với server giả (server ZMQ nhận ảnh rồi trả lỗi): ảnh nhận được đúng khi dùng `--swap-can-colors`.
+  Đổi màu rồi đổi lại thì ảnh trùng khớp từng pixel với ảnh gốc. Chưa thử phím Insert trên cửa sổ GUI thật.
+- **Kết quả sơ bộ, `swap_rb` (chạy trước khi bỏ chế độ này):** `eval/color_swap_rb`, C-3700
+  (`g1_can_sort_bal_from3000_checkpoint-3700`), `swap_hold_test`, chân theo cfg (fixed). Dừng ở 20/40 episode.
+  - Chọn đúng lon **0/20**. Lúc khép tay lần đầu, tay cách lon kia 1–10 cm (thường 2–4) và cách lon nhiệm vụ 9–45 cm.
+  - Kết quả đáng tin nhất nằm ở **9 ca cùng phía**. Model đi theo vị trí thì vẫn chọn đúng, nhưng thực tế cả 9 ca tay
+    **vươn chéo người** sang lon mang màu của lon nhiệm vụ. Ở ca đổi phía, đi theo màu và đi theo vị trí đều ra lon kia,
+    nên các ca này không giúp phân biệt.
+  - Kết luận sơ bộ: C-3700 chọn lon theo màu. Vẫn cần đối chứng bằng `--swap-can-colors` và một lượt màu gốc với code
+    mới (có `chose_target`).
+- Việc cần chạy: cùng checkpoint trên cùng tập cảnh, `--seconds 20 --stop-on-success`, hai `--out`: màu gốc và
+  `--swap-can-colors`. Đọc cột "chọn đúng lon".
+- **Màu gốc, C-3700 trên `swap_hold_test` (`eval/color_none`, 40 ep; `eval/color_goc` chạy lại cùng điều kiện, cho kết quả
+  tương tự):** thành công 19/40. Cùng phía 13/14, **đổi phía 6/26**. **Chọn đúng lon 40/40**, nên thất bại là do gắp, không
+  phải do nhận nhầm lon.
+  - **Nguyên nhân: chế độ chân không khớp lúc train.** `swap_hold_test` không có `lower_body` trong cfg nên eval chạy
+    `fixed`, trong khi C train trên demo `balance`. Cùng checkpoint trên `bal_test` (balance) đạt 34/40, đổi phía 17/20, đổi
+    phía nằm 9/10 với k/c lúc khép 2.9 cm (ở đây 5/22, 8.7 cm).
+  - Cơ chế (mục 5.2n): ở balance, khi eo xoay (khoảng +18°) thì policy thăng bằng xoay pelvis ngược lại khoảng −8° qua
+    hip yaw, và demo gắp chéo được lập kế hoạch theo pose đó. Với chân fixed, pelvis không xoay ngược nên thân xoay quá
+    tay và **bàn tay vượt quá lon về phía chéo người**. `offset_at_close_cm` theo y (dương = vượt về phía chéo người):
+    đổi phía Coca TB +6.6 cm (max 12.8), Pepsi +5.8 cm (max 11.0); cùng phía +1.7 / +0.1 cm. Hai tay lệch đối xứng, nên
+    đây không phải nhiễu.
+  - Video (`coke_100002`, `coke_100018`, `pepsi_100061`): tay vươn chéo tới lon nằm nhưng lướt qua hoặc hạ không tới, rồi
+    khép tay trong không khí. Sau đó tay rỗng vẫn đi về khay như lúc cầm lon, rồi tay vung lên (trạng thái ngoài dữ liệu)
+    và quét lon: lon rơi khỏi bàn 12/40. Model không biết thử lại sau khi gắp hụt.
+  - Hệ quả: eval C trên tập test cũ phải thêm `--lower-body balance`. Chỉ số chọn lon vẫn dùng được với fixed (lệch 6 cm
+    không đổi được lon gần hơn), nhưng tỉ lệ thành công thì không.
+- **Kết quả chính, C-3700 trên `swap_hold_test` với `--lower-body balance`:**
+
+  | | `eval/color_goc_bal` (màu gốc, 40 ep) | `eval/color_doi_bal` (`--swap-can-colors`, 40 ep) |
+  |---|---|---|
+  | Thành công | 31/40 (cùng phía 10/14, đổi phía **21/26**) | 0/40 |
+  | Chọn đúng lon | **40/40** | **0/40** (cùng phía 0/14, đổi phía 0/26) |
+  | k/c tay–lon nhiệm vụ lúc khép TB | 3.7 cm | 20.2 cm (tới lon kia 0.6–15.2 cm) |
+
+  - **C-3700 chọn lon theo màu.** Lượt đổi màu chỉ đổi material thân lon, còn vị trí, khay và chân giữ nguyên. Tay luôn đi
+    tới lon mang màu của lon nhiệm vụ, kể cả ở 11 ca cùng phía, nơi phải vươn chéo người. Kết quả này cũng loại khả năng
+    model học thuộc quỹ đạo theo bố cục cảnh.
+  - Balance đưa đổi phía từ 6/26 (fixed) lên 21/26, xác nhận nguyên nhân chế độ chân không khớp ở trên. Nhóm yếu còn lại là
+    cùng phía nằm 2/6: gắp hụt (k/c lúc khép 5.8–8.6 cm) làm lon rơi. Chọn lon ở nhóm này vẫn đúng.
+  - Rơi lon và xô lon ở lượt đổi màu là hệ quả của việc chọn lon kia. Sim chỉ bật weld kẹp cho đúng cặp tay phải–Coca và
+    tay trái–Pepsi (`G1SortingSim.grasps`), nên tay phải khép lên lon Pepsi không nhấc được, chỉ đẩy hoặc kéo lon. Lon kia
+    lệch 8–559 cm, tức có ca rơi xuống sàn và lăn đi. `chose_target` đo lúc khép tay lần đầu, trước khi lon bị xô, nên không
+    bị ảnh hưởng.
+  - **Video `color_doi_bal` (đủ 40/40, chọn đúng lon 0/40).** Phân loại theo khung hình cuối, đánh giá bằng mắt nên chỉ gần
+    đúng. Model coi "lon Coca" là lon đỏ và "lon Pepsi" là lon xanh, rồi làm trọn nhiệm vụ trên lon đó:
+    | Kết cục | Số ep |
+    |---|---|
+    | Đặt lon cùng màu với lệnh vào khay của nhiệm vụ (ví dụ `coke_100000`: tay phải vươn chéo người, nhấc lon đỏ = Pepsi thật, đặt vào khay đỏ, về ready) | ~20 |
+    | Mang lon cùng màu tới sát mép khay nhưng chưa vào hẳn | ~4 |
+    | Lon cùng màu với lệnh bị làm rơi khỏi bàn | ~11 |
+    | Quét rơi lon nhiệm vụ thật nằm trên đường vươn tay chéo tới lon cùng màu (`coke_100030`, `pepsi_100077`) | 2 |
+    | Làm rơi lon cùng màu gần giữa bàn | 2 |
+    | Ngoại lệ `pepsi_100050` (cùng phía đứng): tay lưỡng lự ở giữa hai lon khoảng 6 s, rồi gắp lon bên mình (Pepsi thật, đang màu đỏ) và đặt vào khay xanh | 1 |
+  - Tay nhấc được lon kia dù sim không bật weld cho cặp này: nắm bằng ma sát ngón tay vẫn nhấc được, nhưng dễ tuột. Vì
+    vậy lon rơi 11/40 so với 3/40 ở màu gốc, và ~20/40 là cận dưới của số ca model "làm đúng theo màu".
+  - `chose_target` mơ hồ khi lần khép đầu xa cả hai lon: `pepsi_100050` (13.1 / 11.7 cm), `coke_100030` (18.4 / 15.2),
+    `pepsi_100077` (15.4 / 13.4). Ba ca này không rõ model chọn lon nào; 37 ca còn lại rõ ràng (tay cách lon kia ≤ 8 cm).
+- **Slide và báo cáo (26/09):** kết quả C đã đưa vào `report/slides` (slide 8–11) và `report/Nvidia_groot.tex`. Trong
+  slide/báo cáo gọi checkpoint này là **C-6700** (3 000 bước + 3 700 bước train tiếp, tức `from3000/checkpoint-3700` ở đây).
+  So với A/B trên cùng 40 cảnh `swap_hold_test`: A 14, B 23, C 31 (mỗi checkpoint với chế độ chân lúc thu). C chưa chạy trên
+  `ik_test`. Cách chấm "xô lon" mới không đổi kết quả A/B: 8 ca B đặt đúng lon mà bị tính trượt đều có lon còn lại lệch ≥ 20 cm.
+
 ### 5.3. Notebook server: chép checkpoint về đĩa local, server chạy nền (24/09)
 - Lần đầu chạy `checkpoint-10000`: nạp thẳng từ Drive mất **13 phút** chỉ riêng `Loading checkpoint shards` (3 shard, 260 s/shard,
   khoảng 15 MB/s). Lúc đó cell server chiếm notebook, nên tunnel (mở từ trước) đã tiêu gần nửa thời hạn 60 phút; muốn mở tunnel
@@ -1217,7 +1426,65 @@ Mục tiêu: gắp được lon **sâu hơn** trên bàn và **rộng hơn** d�
 
 ---
 
+## 6b. Ý tưởng áp dụng từ paper π0.7 (29/09, chưa làm)
+
+Nguồn: `PI/pi07.pdf` (Physical Intelligence, 04/2026). Tóm tắt tiếng Việt và sơ đồ: [`PI/PAPER_PI07_VI.md`](PI/PAPER_PI07_VI.md).
+Ý chính của π0.7: prompt giàu thông tin (subtask, ảnh subgoal, **metadata** Speed/Quality/Mistake) giúp train được trên dữ liệu
+lẫn tốt lẫn kém. Không có metadata thì dữ liệu kém làm hại. Hình 18 của paper: không metadata, throughput nhích từ ≈9.5 lên ≈12
+rồi tụt về ≈9.5 khi thêm dữ liệu kém; có metadata thì tăng liền từ ≈13 lên ≈23.
+
+### Ưu tiên 1: metadata chất lượng trong câu lệnh (không đổi kiến trúc GR00T)
+Hiện trạng code (đã đọc 29/09):
+- `collect_demos.py` chỉ có 2 câu lệnh cố định (`TASKS`) ghi vào `meta/tasks.jsonl`. Mỗi khung có `task_index`, và
+  `annotation.human.task_description` trỏ vào đó. Client gửi câu lệnh qua `language.annotation.human.task_description`.
+- `sim/episode_metrics.py` đo **chỉ số vật lý**, **không cho điểm 1–5**: khoảng hở tới lon kia theo pha, số bước chạm lon kia,
+  lon kia xê dịch, thân chạm bàn/ngả/xoay/trượt, bàn chân xoay, thời điểm và độ lệch điểm gắp. Các chỉ số này nằm trong
+  `meta/collection.jsonl` (`quality`); `tools/demo_quality.py` đo lại bằng phát lại.
+- `--quality-filter` (mặc định bật) **dừng thu ngay** khi vi phạm ngưỡng: chạm hoặc sát lon kia < 1 cm; với balance thêm thân
+  chạm bàn, ngả > 5°, chân xoay > 5°. `meta/rejected.jsonl` chỉ giữ lý do và chỉ số, **không giữ quỹ đạo**.
+
+Cần làm:
+1. Thêm chế độ ghi tiếp khi vi phạm, lưu parquet + video như episode thường. Rollout closed-loop (`--record-vla`) là nguồn
+   thứ hai, nhưng phải chuyển sang định dạng LeRobot.
+2. Quy chỉ số thành nhãn, tự động từ sim:
+   - `Mistake` gắn **theo khung**, vì `task_index` là cột theo khung: khung đang vi phạm → `true`.
+   - `Quality` 1–5 gắn theo episode, tính từ biên an toàn (khoảng hở nhỏ nhất, góc ngả lớn nhất, độ lệch điểm gắp). Ngưỡng
+     từng mức lấy theo phân phối thật (bảng trung vị theo nhóm của `demo_quality.py`).
+   - `Speed` tạm bỏ vì demo planner có tốc độ khá đều.
+3. `tasks.jsonl` chứa các tổ hợp, vd "Pick up the Coca-Cola can and place it in the red tray. Quality: 4. Mistake: false."
+   (2 lon × 5 mức × 2 = 20 câu). Giữ khoảng 15% dữ liệu dùng câu gốc không metadata (dropout như π0.7).
+4. Lúc chạy gửi "… Quality: 5. Mistake: false."
+
+Thí nghiệm kiểm chứng (cùng số bước train, cùng tập test):
+- (a) chỉ demo sạch;
+- (b) sạch + kém, không nhãn;
+- (c) sạch + kém, có nhãn.
+
+Kỳ vọng (c) ≥ (a) > (b). Nếu (b) ≈ (c) thì model không dùng metadata.
+
+Rủi ro:
+- Fine-tune mặc định đóng băng backbone VLM (chỉ tune projector + action head). Chưa biết action head có tận dụng được chữ
+  "Quality: k" qua backbone đóng băng không; nếu không thì thử tune thêm LLM.
+- GR00T lúc chạy không có CFG, nên không khuếch đại được như π0.7.
+- Vài trăm demo sim có thể quá ít để thấy hiệu ứng.
+
+### Ưu tiên 2: đưa rollout eval vào dữ liệu train
+π0.7 train cả trên rollout của các policy cũ (có gắn nhãn) để phủ vùng trạng thái lệch khỏi demo. Các lượt
+`tools/eval_closed_loop.py` của A/B/C là nguồn sẵn có; gắn nhãn Mistake/Quality theo cách ở trên. Phụ thuộc Ưu tiên 1.
+
+### Ưu tiên 3: nối chunk (liên quan nhánh `feat/smooth-vla-trajectory`)
+π0.7 sinh chunk 50 bước nhưng chỉ chạy 15–25 bước rồi suy luận lại (bất đồng bộ). Nó còn dùng **training-time RTC**: lúc
+train mô phỏng trễ 0–12 bước, với phần đầu chunk đã biết. Ở dự án (chunk 40 bước, `--vla-action-hz 25`), thử trước việc chỉ
+chạy một phần chunk rồi suy luận lại; đây là thay đổi nhỏ, đo closed-loop trước khi tính tới RTC.
+
+### Không nên làm (lúc này)
+- World model sinh ảnh subgoal (BAGEL 14B, 4×H100, ≈1.25 s/lần) và bộ nhớ video MEM: vượt ngân sách Colab.
+- Đổi action space sang end-effector: phụ lục E của paper không thấy EE hơn joint khi chuyển robot.
+
 ## 7. Việc tiếp theo
+
+- **29/09: ý tưởng từ paper π0.7 (mục 6b), chưa làm.** Ưu tiên 1 là metadata Quality/Mistake trong câu lệnh, giữ lại demo kém
+  thay vì lọc bỏ, và kiểm chứng bằng thí nghiệm (a)/(b)/(c).
 
 - **25/09: plan sinh lại dữ liệu với balance (checkpoint C), đã duyệt; bước 0 (5.2l), 0b (5.2k), 1 (5.2m), 2 (5.2n, đạt), 3 (5.2p), 4 (5.2o), 5 (5.2q), 6 (5.2r), 7 (5.2s) xong, tiếp theo bước 8 (train C trên Colab):** [`docs/PLAN_BALANCE_DATASET.md`](docs/PLAN_BALANCE_DATASET.md).
   Gồm: eval A với cấu hình 20 s + stop; kiểm chứng số liệu nhận xét bằng `tools/demo_quality.py` (0b); `collect_demos
@@ -1228,6 +1495,13 @@ Mục tiêu: gắp được lon **sâu hơn** trên bàn và **rộng hơn** d�
   - Nhận xét 25/09 về dữ liệu B (chưa kiểm chứng): demo đổi phía cách lon kia trung vị 1.4 cm trước và 1.8 cm sau khi kẹp
     (`LIFT_HEIGHT` 0.10 để đáy lon đang cầm thấp hơn đỉnh lon kia); 49/400 demo hông tì bàn (đều lon nằm); yaw thân lệch tới
     12.6° ở ca đổi phía; state không có tư thế pelvis. Đưa độ ngả vào state để sau khi có kết quả C.
+
+- **26/09: eval tách theo nhóm và "đã xong" (mục 5.2u).** Còn mở: lon nằm tự lăn làm lượt 20 s tính nhầm "xô lon còn lại".
+  Phương án: chỉ tính "xô" khi robot hoặc lon đang cầm có chạm lon còn lại; hoặc thêm ma sát lăn cho lon (đổi vật lý, phải
+  kiểm tra lại phát lại dataset).
+
+- **26/09: train C bị ngắt ở bước 4000 (batch 128 × 6 700).** Notebook đã có `INIT_FROM` (mục 5.2v); tiếp theo train từ
+  `checkpoint-4000` với `MAX_STEPS` 2700, rồi Bước 11 và eval closed-loop.
 
 0. **Thu hồi HF token `hf_JbmJ...`** trên HuggingFace (mục 2, Bảo mật).
 1. ~~Chạy Bước 11 pilot~~; ~~chạy closed-loop pilot~~ (mục 5.1); ~~sinh, verify, vẽ, nén dataset IK~~ (mục 4.4);
