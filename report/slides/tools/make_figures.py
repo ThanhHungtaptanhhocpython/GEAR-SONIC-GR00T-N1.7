@@ -5,8 +5,11 @@
     assets/pepsi_lying_swap_1.png khung camera ego_view, cảnh đổi phía, tay vươn chéo (slide 10)
 
 Cần: numpy, pandas, matplotlib, pillow, mujoco (collect_demos dùng), imageio + imageio-ffmpeg (đọc video).
-Dùng:  python report/slides/tools/make_figures.py [đường_dẫn_dataset]
+Dùng:  python report/slides/tools/make_figures.py [đường_dẫn_dataset] [--can-positions-only] [--out FILE]
+       Ví dụ hình dataset C (slide 08): python report/slides/tools/make_figures.py datasets/g1_can_sort_bal \
+           --can-positions-only --out report/slides/assets/can_positions_C.png
 """
+import argparse
 import json
 import pathlib
 import sys
@@ -24,24 +27,33 @@ REPO = pathlib.Path(__file__).resolve().parents[3]
 ASSETS = REPO / "report/slides/assets"
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "tools"))
-from collect_demos import CAN_HALF_LENGTH  # noqa: E402
+from collect_demos import CAN_HALF_LENGTH, sample_randomization, scene_layout  # noqa: E402
 from plot_can_positions import load_cans, xy  # noqa: E402
 
-DATASET = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "datasets/g1_can_sort_swap_hold"
+DATASET = REPO / "datasets/g1_can_sort_swap_hold"
 COLORS = {"coke": "#D6453D", "pepsi": "#2F6FD1"}  # đã qua kiểm tra tách màu cho người mù màu
 INK, MUTED, BG = "#1B3A2D", "#6B7A72", "#F4F7F5"
 
 
-def plot_can_positions():
+def plot_can_positions(out=ASSETS / "can_positions.png"):
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 15, "text.color": INK})
     cans, _, _ = load_cans(DATASET)
+    # Episode "đã xong" (collect_demos --done-per-task): lon nhiệm vụ nằm sẵn trong khay đích, không vẽ trên bàn
+    meta = [json.loads(line) for line in (DATASET / "meta/collection.jsonl").read_text().splitlines() if line.strip()]
+    done = [bool(m.get("done")) for m in meta]
+    tray = scene_layout()["tray"]
+    done_cans = []  # (lon, vị trí trong khay, swapped)
+    for m, is_done in zip(meta, done):
+        if is_done:
+            rand = sample_randomization(m["task"], m["seed"], m["cfg"])
+            done_cans.append((m["task"], tray[m["task"]][:2] + rand["tray"] + rand["done_offset"], m["swapped"]))
     fig, axes = plt.subplots(1, 2, figsize=(14, 6.2), facecolor=BG)
     for ax, swapped, title in zip(axes, [False, True], ["Cùng phía", "Đổi phía"]):
         ax.set_facecolor(BG)
         for side in (-1, 1):
             ax.add_patch(Rectangle((side * 0.32 - 0.06, 0.30), 0.12, 0.2, fill=False, ec="#9AA8A0", ls="--", lw=1.5))
         for c in ("coke", "pepsi"):
-            rows = [r for r in cans[c] if r[3] == swapped]
+            rows = [r for r, is_done in zip(cans[c], done) if r[3] == swapped and not is_done]
             upright = np.array([p for p, lying, *_ in rows if not lying]).reshape(-1, 2)
             ax.scatter(*xy(upright), s=16, color=COLORS[c], alpha=.8, lw=0)
             segs = []
@@ -51,7 +63,9 @@ def plot_can_positions():
                     a, b = xy(np.array(p) - d), xy(np.array(p) + d)
                     segs.append([(a[0][0], a[1][0]), (b[0][0], b[1][0])])
             ax.add_collection(LineCollection(segs, colors=COLORS[c], lw=1.3, alpha=.55))
-        k = sum(1 for r in cans["coke"] if r[3] == swapped)
+            in_tray = np.array([p for task, p, sw in done_cans if task == c and sw == swapped]).reshape(-1, 2)
+            ax.scatter(*xy(in_tray), s=60, facecolor="none", edgecolor=COLORS[c], lw=1.8)
+        k = sum(1 for r, is_done in zip(cans["coke"], done) if r[3] == swapped and not is_done)
         ax.set_title(f"{title}  ·  {k} episode", fontsize=20, color=INK, loc="left", pad=12, fontweight="bold")
         ax.text(-0.32, 0.52, "khay Pepsi", ha="center", color=MUTED, fontsize=14)
         ax.text(0.32, 0.52, "khay Coca", ha="center", color=MUTED, fontsize=14)
@@ -68,9 +82,12 @@ def plot_can_positions():
               Line2D([], [], marker="o", ls="", color=COLORS["pepsi"], ms=9, label="Pepsi"),
               Line2D([], [], marker="o", ls="", color=MUTED, ms=7, label="chấm = lon đứng"),
               Line2D([], [], color=MUTED, lw=2, label="vạch = lon nằm")]
-    fig.legend(handles=legend, loc="lower center", ncol=4, frameon=False, fontsize=15)
+    if done_cans:
+        legend.append(Line2D([], [], marker="o", ls="", markerfacecolor="none", markeredgecolor=MUTED, mew=1.8,
+                             ms=10, label=f"vòng = {len(done_cans)} episode đã xong"))
+    fig.legend(handles=legend, loc="lower center", ncol=len(legend), frameon=False, fontsize=15)
     plt.tight_layout(rect=(0, 0.07, 1, 1))
-    fig.savefig(ASSETS / "can_positions.png", dpi=130, facecolor=BG)
+    fig.savefig(out, dpi=130, facecolor=BG)
 
 
 def extract_frames():
@@ -93,6 +110,15 @@ def extract_frames():
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    plot_can_positions()
-    extract_frames()
+    parser = argparse.ArgumentParser(description="Vẽ lại hình dữ liệu dùng trong slide.")
+    parser.add_argument("dataset", nargs="?", type=pathlib.Path, default=DATASET)
+    parser.add_argument("--can-positions-only", action="store_true",
+                        help="chỉ vẽ hình vị trí lon, không trích khung camera")
+    parser.add_argument("--out", type=pathlib.Path, default=ASSETS / "can_positions.png",
+                        help="file hình vị trí lon")
+    args = parser.parse_args()
+    DATASET = args.dataset
+    plot_can_positions(args.out)
+    if not args.can_positions_only:
+        extract_frames()
     print(f"Đã ghi hình vào {ASSETS}")

@@ -20,10 +20,10 @@
 <div style="display:flex; flex-direction:row; gap:20px; flex:1">
 <div style="position:relative; width:403px; display:flex; flex-direction:column; padding:104px 0px 0px 0px">
 <div style="flex:1; display:flex; flex-direction:column; gap:8px; background:linear-gradient(180deg, #EAF6EF 0%, #F6FBF8 100%); border-radius:22px; padding:74px 24px 22px 24px">
-<p style="font-size:26px; font-weight:700; color:#1FA35C">Bước 1 · Hoàn tất</p>
+<p style="font-size:26px; font-weight:700; color:#1FA35C">Bước 1 · Đã xong</p>
 <h3 style="font-size:34px; font-weight:800; line-height:1.2; color:#123F2B; white-space:nowrap">Checkpoint C</h3>
 <hr style="border-top:2px solid #D6E8DD">
-<p style="font-size:25px; line-height:1.45; color:#3F4F47">Dữ liệu 440 episode thu với chân tự giữ thăng bằng, cân bằng 4 nhóm cảnh. Mục tiêu: không kém B trên cả hai tập, lon đứng đổi phía vượt 0/4.</p>
+<p style="font-size:25px; line-height:1.45; color:#3F4F47">Tập B: 31/40 (B-9000: 23/40), lon đứng đổi phía 2/4; C chọn lon theo màu. Còn thiếu: đánh giá trên tập A.</p>
 </div>
 <div style="position:absolute; left:119px; top:0px; width:164px; height:164px; border-radius:50%; background:#F2FAF5; border:3px solid #D3ECDD"></div>
 <div style="position:absolute; left:137px; top:18px; width:128px; height:128px; border-radius:50%; background:#D2EEDD"></div>
@@ -61,5 +61,5 @@
 </div>
 </div>
 <p style="font-size:24px; font-style:italic; color:#6B7A72">LoRA cho bộ mã hoá ảnh chỉ thử nếu lỗi đến từ nhận diện màu lon.</p>
-<aside>Bước 1 là việc đang làm: checkpoint C train trên dữ liệu 440 episode thu với chân tự giữ thăng bằng. Bước 2 bỏ ràng buộc weld: trong mô phỏng lon dính vào cổ tay khi tay khép trong bán kính 5 cm, robot thật không có cơ chế này. Bước 3 có điểm dừng: cách ghép đầu vào bộ mã hoá SONIC chưa kiểm chứng và NVIDIA chưa công bố checkpoint hay dữ liệu cho tag UNITREE_G1_SONIC; nếu không gán được token thì giữ bộ thăng bằng GR00T-WBC. Bước 4 bắt đầu với chính nhiệm vụ phân loại lon trên robot thật.</aside>
+<aside>Bước 1 đã xong: C-6700 đạt 31/40 trên tập B so với 23/40 của B-9000, lon đứng đổi phía 2/4, và thí nghiệm đổi màu lon cho thấy C chọn lon theo màu. Mục tiêu đặt ra là không kém B trên cả hai tập; tập A chưa chạy. Bước 2 bỏ ràng buộc weld: trong mô phỏng lon dính vào cổ tay khi tay khép trong bán kính 5 cm, robot thật không có cơ chế này. Bước 3 có điểm dừng: cách ghép đầu vào bộ mã hoá SONIC chưa kiểm chứng và NVIDIA chưa công bố checkpoint hay dữ liệu cho tag UNITREE_G1_SONIC; nếu không gán được token thì giữ bộ thăng bằng GR00T-WBC. Bước 4 bắt đầu với chính nhiệm vụ phân loại lon trên robot thật.</aside>
 </section>

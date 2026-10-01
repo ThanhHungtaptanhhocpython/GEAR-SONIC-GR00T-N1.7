@@ -243,7 +243,7 @@ sonic = section("sonic", "padding:210px 128px 116px 120px; display:flex; flex-di
 
 # ---------------------------------------------------------------- 10 ROADMAP
 STEPS = [
-    ("Database", "Bước 1 · Hoàn tất", "Checkpoint C", "Dữ liệu 440 episode thu với chân tự giữ thăng bằng, cân bằng 4 nhóm cảnh. Mục tiêu: không kém B trên cả hai tập, lon đứng đổi phía vượt 0/4."),
+    ("Database", "Bước 1 · Đã xong", "Checkpoint C", "Tập B: 31/40 (B-9000: 23/40), lon đứng đổi phía 2/4; C chọn lon theo màu. Còn thiếu: đánh giá trên tập A."),
     ("Wrench", "Bước 2", "Gắp vật lý thật", "Bỏ cơ chế dính lon vào tay trong mô phỏng, gắp bằng lực ma sát; ngẫu nhiên hoá ánh sáng, nền và camera."),
     ("Verified", "Bước 3", "Kiểm chứng SONIC", "Gán motion token bằng bộ mã hoá SONIC. Đạt thì fine-tune GR00T với tag UNITREE_G1_SONIC; không đạt thì giữ bộ thăng bằng GR00T-WBC."),
     ("Globe", "Bước 4", "Thử trên G1 thật", "Bắt đầu với nhiệm vụ phân loại lon, bổ sung demo thật qua teleop PICO; sau đó mở rộng nhiệm vụ mới."),
@@ -276,7 +276,7 @@ roadmap = section("roadmap", "padding:210px 128px 126px 120px; display:flex; fle
 <div style="display:flex; flex-direction:row; gap:{GAP}px; flex:1">
 {"".join(cols)}
 </div>
-<p style="font-size:24px; font-style:italic; color:{MUTED}">LoRA cho bộ mã hoá ảnh chỉ thử nếu lỗi đến từ nhận diện màu lon.</p>""", "Bước 1 là việc đang làm: checkpoint C train trên dữ liệu 440 episode thu với chân tự giữ thăng bằng. Bước 2 bỏ ràng buộc weld: trong mô phỏng lon dính vào cổ tay khi tay khép trong bán kính 5 cm, robot thật không có cơ chế này. Bước 3 có điểm dừng: cách ghép đầu vào bộ mã hoá SONIC chưa kiểm chứng và NVIDIA chưa công bố checkpoint hay dữ liệu cho tag UNITREE_G1_SONIC; nếu không gán được token thì giữ bộ thăng bằng GR00T-WBC. Bước 4 bắt đầu với chính nhiệm vụ phân loại lon trên robot thật.")
+<p style="font-size:24px; font-style:italic; color:{MUTED}">LoRA cho bộ mã hoá ảnh chỉ thử nếu lỗi đến từ nhận diện màu lon.</p>""", "Bước 1 đã xong: C-6700 đạt 31/40 trên tập B so với 23/40 của B-9000, lon đứng đổi phía 2/4, và thí nghiệm đổi màu lon cho thấy C chọn lon theo màu. Mục tiêu đặt ra là không kém B trên cả hai tập; tập A chưa chạy. Bước 2 bỏ ràng buộc weld: trong mô phỏng lon dính vào cổ tay khi tay khép trong bán kính 5 cm, robot thật không có cơ chế này. Bước 3 có điểm dừng: cách ghép đầu vào bộ mã hoá SONIC chưa kiểm chứng và NVIDIA chưa công bố checkpoint hay dữ liệu cho tag UNITREE_G1_SONIC; nếu không gán được token thì giữ bộ thăng bằng GR00T-WBC. Bước 4 bắt đầu với chính nhiệm vụ phân loại lon trên robot thật.")
 
 # ---------------------------------------------------------------- 11 THANKS
 TR = """<svg aria-hidden="true" width="620" height="520" viewBox="0 0 620 520" style="position:absolute; left:1300px; top:0px; width:620px; height:520px">

@@ -15,8 +15,8 @@
 </div>
 <div style="display:flex; flex-direction:row; gap:40px; align-items:start">
 <div style="width:990px; display:flex; flex-direction:column; gap:14px; background:#F4F7F5; border:1px solid #E2E9E5; border-radius:24px; padding:24px">
-<img src="/_blob/556bcd70d48db8418bdfc56fe6ea8214" alt="Vị trí ban đầu của lon Coca đỏ và Pepsi xanh trong 400 episode, chia cảnh cùng phía và đổi phía" style="width:940px; height:416px; object-fit:contain; border-radius:12px">
-<p style="font-size:24px; color:#5D6B64">Vị trí ban đầu hai lon, phiên bản B · 400 episode · 93.200 khung hình, 25 Hz</p>
+<img src="/_blob/d730541930fbe81fb1f892b073b01231" alt="Vị trí ban đầu của lon Coca đỏ và Pepsi xanh trong 440 episode của phiên bản C, chia cảnh cùng phía và đổi phía, vòng trong khay là episode đã xong" style="width:940px; height:416px; object-fit:contain; border-radius:12px">
+<p style="font-size:24px; color:#5D6B64">Vị trí ban đầu hai lon, phiên bản C · 440 episode · 99.343 khung hình, 25 Hz</p>
 </div>
 <div style="flex:1; display:flex; flex-direction:column; gap:14px">
 <div style="display:flex; flex-direction:row; gap:18px; align-items:center; border:2px solid #E2E9E5; border-radius:16px; padding:16px 20px">
@@ -33,19 +33,26 @@
 <p style="font-size:24px; color:#5D6B64">Hạn chế: vị trí lon gắn cố định với loại lon</p>
 </div>
 </div>
-<div style="display:flex; flex-direction:row; gap:18px; align-items:center; background:#E6F4EC; border:2px solid #2DB36A; border-radius:16px; padding:16px 20px">
-<p style="width:96px; font-size:28px; font-weight:800; color:#1C8A4B">B</p>
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center; border:2px solid #E2E9E5; border-radius:16px; padding:16px 20px">
+<p style="width:96px; font-size:28px; font-weight:800; color:#1A4A35">B</p>
 <div style="flex:1; display:flex; flex-direction:column; gap:2px">
 <p style="font-size:26px; font-weight:700; color:#173F2E">400 demo, 200 cảnh đổi phía</p>
-<p style="font-size:24px; color:#4B5B53">Buộc mô hình phân biệt lon qua màu</p>
+<p style="font-size:24px; color:#5D6B64">Buộc mô hình phân biệt lon qua màu</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:row; gap:18px; align-items:center; background:#E6F4EC; border:2px solid #2DB36A; border-radius:16px; padding:16px 20px">
+<p style="width:96px; font-size:28px; font-weight:800; color:#1C8A4B">C</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:2px">
+<p style="font-size:26px; font-weight:700; color:#173F2E">440 demo, chân tự giữ thăng bằng</p>
+<p style="font-size:24px; color:#4B5B53">Đủ 4 nhóm cảnh, thêm 40 cảnh đã xong</p>
 </div>
 </div>
 <div style="display:flex; flex-direction:column; gap:6px; background:#1A4A35; border-radius:16px; padding:22px 24px">
 <p style="font-size:24px; font-weight:700; color:#2DB36A; letter-spacing:1px; text-transform:uppercase">Fine-tune trên Colab</p>
-<p style="font-size:24px; color:#F2F7F4">A100 80 GB · batch 64 · 10k bước</p>
-<p style="font-size:24px; color:#BFD8CB">Loss 1,33 → 0,0041; backbone đóng băng</p>
+<p style="font-size:24px; color:#F2F7F4">C: RTX PRO 6000 · batch 128 · 6,7k bước</p>
+<p style="font-size:24px; color:#BFD8CB">MAE open-loop 0,011; backbone đóng băng</p>
 </div>
 </div>
 </div>
-<aside>Không có dataset công khai đúng bài toán nên nhóm tự sinh demo trong mô phỏng theo định dạng LeRobot, 25 Hz. Pilot: quỹ đạo lập trình sẵn, mô hình học thuộc. Bản A: động học ngược cho từng cảnh, lon đứng hoặc nằm hướng bất kỳ, nhưng Coca luôn bên phải nên mô hình có lối tắt. Bản B: thêm 200 cảnh hai lon đổi phía và giữ yên 2,5 s cuối. Chỉ giữ demo phát lại thành công. Fine-tune dưới tag NEW_EMBODIMENT vì tag REAL_G1 giữ thống kê của robot thật.</aside>
+<aside>Không có dataset công khai đúng bài toán nên nhóm tự sinh demo trong mô phỏng theo định dạng LeRobot, 25 Hz. Pilot: quỹ đạo lập trình sẵn, mô hình học thuộc. Bản A: động học ngược cho từng cảnh, lon đứng hoặc nằm hướng bất kỳ, nhưng Coca luôn bên phải nên mô hình có lối tắt. Bản B: thêm 200 cảnh hai lon đổi phía và giữ yên 2,5 s cuối. Bản C (hình): thu lại với chân tự giữ thăng bằng, 50 demo mỗi nhóm cùng/đổi phía × đứng/nằm cho mỗi lon, thêm 40 cảnh lon đã nằm sẵn trong khay để mô hình học cách dừng. Checkpoint C-6700: batch 128 trên GPU RTX PRO 6000 của Colab, 3.000 bước rồi train tiếp 3.700 bước sau khi runtime bị ngắt; MAE open-loop tập test 0,011. A-10000: A100 80 GB, batch 64, 10k bước; B-9000: batch 80. Chỉ giữ demo phát lại thành công. Fine-tune dưới tag NEW_EMBODIMENT vì tag REAL_G1 giữ thống kê của robot thật.</aside>
 </section>

@@ -27,12 +27,15 @@ BLOBS = {
     "baafa340f95ff6609ebd3c315364b382": ASSETS / "logo_h.png",
     "f1ac4e10cfa6c9c1fb5c0e9c0bfcf6b5": ASSETS / "logo_big.png",
     "556bcd70d48db8418bdfc56fe6ea8214": ASSETS / "can_positions.png",
+    "d730541930fbe81fb1f892b073b01231": ASSETS / "can_positions_C.png",
     "094397df87a7c87e25a4bffbd8d6c683": ASSETS / "coke_stand_same_0.png",
     "cc9f5ca42a19c8d5468a36e5f25c9832": ASSETS / "pepsi_lying_swap_1.png",
     "68d57725bccee1d31dd9ea25c8f4a5f9": FIG / "arch.png",
     "0092ac61791bf793be24ab6022adbf52": FIG / "sonic_3layer_control_architecture.jpg",
     "d8a9dacc0f64424f30f501a67cd14cb7": FIG / "vla_gr00t_sonic_flow.jpg",
     "70a4340cdd36daf82960b7336fa94eef": FIG / "front.png",
+    "130ba67d447c403ff86e17f6dc8435b7": ASSETS / "cover_video_still.png",  # ảnh tĩnh của video bìa
+    "ab2f94b32e672f942b159bb6b59077e6": ASSETS / "cover_video.mp4",  # video bìa (PDF chỉ hiện ảnh tĩnh)
 }
 
 # Bản vẽ nét thay cho <x-icon>: trình xem slide web có bộ icon riêng, trình duyệt thì không.
@@ -128,10 +131,15 @@ def find_browser():
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     html, n = build_html()
     print(f"HTML: {html} ({n} slide)")
     if "--html-only" not in sys.argv:
+        before = PDF_OUT.stat().st_mtime if PDF_OUT.exists() else None
         # virtual-time-budget: chờ font Google tải xong rồi mới in
         subprocess.run([find_browser(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
                         "--virtual-time-budget=15000", f"--print-to-pdf={PDF_OUT}", html.as_uri()], check=True)
+        # Trình duyệt vẫn báo thành công khi file PDF đang mở ở chương trình khác (bị khoá), nên tự kiểm tra
+        if not PDF_OUT.exists() or PDF_OUT.stat().st_mtime == before:
+            sys.exit(f"LỖI: {PDF_OUT.name} không được ghi đè. Đóng file PDF đang mở (VS Code, trình xem PDF) rồi chạy lại.")
         print(f"PDF:  {PDF_OUT}")
