@@ -98,6 +98,12 @@ class G1CanSortingSim:
         self.coke_bid = self.grasps["coke"]["can_bid"]
         self.pepsi_bid = self.grasps["pepsi"]["can_bid"]
 
+        # Geom thân lon và material gốc, để đổi màu hai lon cho nhau (thử model có nhìn màu không)
+        self._can_body_gids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, g)
+                               for g in ("coke_body", "pepsi_body")]
+        self._can_body_matids = self.model.geom_matid[self._can_body_gids].copy()
+        self.can_colors_swapped = False
+
         # Tư thế sẵn sàng mặc định lấy từ ctrl của keyframe (ready_table, hoặc stand)
         self.stand_key_id = ready_key_id(self.model)
         self.default_ctrl = np.zeros(self.model.nu, dtype=np.float32)
@@ -137,6 +143,17 @@ class G1CanSortingSim:
             # Tâm vùng nắm giữa ngón cái và các ngón còn lại (ngón cái nằm phía +y ở tay phải, -y ở tay trái)
             "grasp_point": np.array([0.13, 0.05 if side == "right" else -0.05, 0.0]),
         }
+
+    def set_can_colors_swapped(self, swapped: bool):
+        """Đổi material thân lon: lon Coca mang màu xanh Pepsi và ngược lại (vị trí, vật lý, khay giữ nguyên).
+
+        Chỉ đổi model (không đụng MjData) nên giữ nguyên qua reset(); áp dụng cho cả viewer lẫn ảnh render_camera.
+        """
+        if min(self._can_body_gids) < 0:
+            raise ValueError(f"Scene {self.scene_path.name} không có geom coke_body / pepsi_body để đổi màu lon")
+        matids = self._can_body_matids[::-1] if swapped else self._can_body_matids
+        self.model.geom_matid[self._can_body_gids] = matids
+        self.can_colors_swapped = bool(swapped)
 
     def is_grasped(self, can: str) -> bool:
         return bool(self.data.eq_active[self.grasps[can]["eq_id"]])

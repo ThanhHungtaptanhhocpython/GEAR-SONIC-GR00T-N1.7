@@ -1,0 +1,30 @@
+<section id="fig4_3" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 4.3 · Huấn luyện GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">19</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Cách tạo motion token</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">2 token × 32 chiều, mỗi chiều 32 nấc; decoder và GR00T chỉ thấy dãy 64 số nối liền</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Encoder đọc khoảng 1 giây chuyển động, xuất 64 số thực.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Xếp thành 2 token × 32 ô; FSQ làm tròn mỗi ô về 1 trong 32 nấc, cách nhau 1/16.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Nối lại thành dãy 64 số: đây là motion token mà decoder nhận và GR00T học dự đoán.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Số 32 có hai nghĩa: 32 ô mỗi token, và 32 giá trị mỗi ô.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/fsq.svg" alt="Hình 4.3: Cách tạo motion token" style="width:1050px; height:532px; object-fit:contain">
+</div>
+<aside>Số 32 xuất hiện hai lần với hai nghĩa: mỗi token có 32 ô, và mỗi ô chỉ nhận một trong 32 giá trị. Các giá trị trong hình chỉ để minh hoạ.</aside>
+</section>

@@ -1,0 +1,30 @@
+<section id="fig1_4" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 1.4 · Tổng quan GR00T N1.7 và GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">05</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">MotionBricks: Kinematic Planner của SONIC</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Từ cùng một tư thế đứng, bốn lệnh cho bốn đoạn chuyển động khác nhau</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Đầu vào</b>: 4 khung tư thế gần nhất và lệnh đơn giản: kiểu chuyển động, hướng, tốc độ, độ cao.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Đầu ra</b>: chuỗi tư thế 24–64 khung ở 30 Hz, tức 0,8–2,1 s; cứ khoảng 1 s planner sinh tiếp đoạn mới.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Đoạn chuyển tiếp như từ đứng sang chạy, từ đứng cúi xuống bò do mô hình tự sinh, không quay sẵn.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Chỉ là chuyển động động học: không có vật lý. SONIC nhận chuyển động này và tự giữ thăng bằng khi làm theo.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/motionbricks/planner_demo_still.png" data-video="/_asset/motionbricks/planner_demo.mp4" alt="Hình 1.4: MotionBricks: Kinematic Planner của SONIC" style="width:866px; height:704px; object-fit:contain">
+</div>
+<aside>Video do nhóm thực hiện tạo bằng cách chạy tệp planner NVIDIA phát hành trên CPU, mỗi ô ghép ba lần gọi planner, rồi đặt tư thế vào mô hình G1 trong MuJoCo để hiển thị, không mô phỏng vật lý. Trong 3 giây đầu robot đi được 1,8 m, chạy được 4,6 m. Khi GR00T điều khiển robot, planner không chạy; planner chỉ dùng khi điều khiển bằng tay cầm, bàn phím, hoặc để sinh chân khi teleop VR ba điểm.</aside>
+</section>

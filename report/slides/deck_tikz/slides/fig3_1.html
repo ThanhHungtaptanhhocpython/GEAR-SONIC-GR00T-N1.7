@@ -1,0 +1,29 @@
+<section id="fig3_1" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 3.1 · Tiền xử lý dữ liệu huấn luyện SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">14</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Tiền xử lý bộ dữ liệu khoảng 700 giờ</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Sáu bước từ lúc quay chuyển động người tới lúc sẵn sàng huấn luyện SONIC</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Bước 1–2, Bones Studio</b>: hơn 170 diễn viên, Vicon 120 khung/giây, đưa về một khung xương chung; khoảng 700 giờ.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Bước 3–5, NVIDIA</b>: retarget sang G1 bằng GMR và PyRoki; loại động tác không làm được, còn 611 giờ; lật gương, chia tập, 317.189 clip huấn luyện.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Bước 6</b> (nét đứt, suy ra từ mã nguồn): lưu motion library 30 khung/giây, nội suy lên 50 khi huấn luyện.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/rp01_pipeline.svg" alt="Hình 3.1: Tiền xử lý bộ dữ liệu khoảng 700 giờ" style="width:1050px; height:606px; object-fit:contain">
+</div>
+<aside>Hình mô tả sáu bước đưa bộ dữ liệu khoảng 700 giờ, dùng để huấn luyện mô hình trong bài báo SONIC và nhiều khả năng là bộ Bones RP01, từ lúc quay tới lúc sẵn sàng huấn luyện. Hai bước đầu do Bones Studio thực hiện: hơn 170 diễn viên gắn điểm đánh dấu được quay bằng hệ thống Vicon ở 120 khung hình mỗi giây, với hơn 20 phong cách diễn; chuyển động của mọi diễn viên sau đó được đưa về một khung xương người chung, lưu ở dạng BVH và FBX, tổng khoảng 700 giờ. Ba bước tiếp theo do NVIDIA thực hiện theo bài báo: chuyển tư thế người sang robot G1 bằng GMR và PyRoki, được 29 góc khớp ở mỗi khung; loại các động tác robot không làm được trên sàn phẳng như leo cầu thang hay ngồi, còn 611 giờ; thêm bản lật gương trái–phải và chia thành một tập huấn luyện 317.189 clip cùng hai tập kiểm tra. Bước cuối, vẽ nét đứt, không có trong bài báo mà được suy ra từ mã nguồn công khai: mỗi clip được lưu thành một tệp motion library ở 30 khung mỗi giây, rồi nội suy lên 50 khung mỗi giây khi huấn luyện. Dữ liệu sau bước này được dùng để huấn luyện SONIC và Kinematic Planner.</aside>
+</section>

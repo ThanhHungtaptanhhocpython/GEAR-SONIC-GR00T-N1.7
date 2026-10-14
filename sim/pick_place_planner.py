@@ -61,7 +61,7 @@ STEPS = {
     "retreat": 30,   # rút tay ra và lên cao
     "return": 35,    # về điểm cao ngay phía trên tư thế ready
     "settle": 20,    # hạ thẳng xuống tư thế ready
-    "hold": 35,      # đứng yên để model học dừng lại
+    "hold": 35,      # đứng yên để model học dừng lại (mặc định; collect_demos.py --hold-seconds đổi qua hold_steps)
 }
 TOTAL_STEPS = sum(STEPS.values())
 
@@ -103,6 +103,35 @@ FREE_PATH_POS_TOL = 0.03
 # 120 episode đổi phía: 1 cm giữ nguyên số episode thu được, số lần xô lon còn lại giảm từ 12 xuống 5; 2 cm mất 1/4 số ca
 # lon đứng)
 OTHER_CAN_MARGIN = 0.01
+# Khoảng hở lớn hơn được ưu tiên ở các đoạn không bắt buộc phải sát lon còn lại, thử lần lượt tới OTHER_CAN_MARGIN
+# (không làm mất episode). Demo đi sát lon còn lại thì model, vốn lệch 2–5 cm, xô trúng nó (MEMO mục 5.2k: ca đổi phía
+# model làm hỏng có demo cách lon còn lại trung vị 2.6 cm, ca làm được 5.4 cm):
+#   - vươn tay, hạ xuống, tiến vào lon (tư thế gắp thì vẫn do khoảng cách hai lon quyết định);
+#   - mang lon tới trên khay (sau khi nhấc lon lên cao hơn đỉnh lon còn lại CARRY_CLEARANCE).
+# Mức đầu lớn hơn khoảng hở mong muốn vì lúc chạy tay lệch khỏi kế hoạch 1.5–2 cm (khớp tay bám chậm theo PD, thân
+# chuyển động): lập với 3 cm thì chạy thật chỉ còn trung vị 1.5 cm (đo 25/09, 32 episode đổi phía, fixed và balance như nhau)
+APPROACH_MARGINS = (0.05, 0.04, 0.03, 0.02, OTHER_CAN_MARGIN)
+CARRY_MARGINS = (0.06, 0.04, 0.02, OTHER_CAN_MARGIN)
+# Lon còn lại nằm gần đường mang lon (cách đoạn thẳng lon -> khay theo phương ngang dưới khoảng này): nhấc lon lên cho
+# đáy lon đang cầm cao hơn đỉnh lon còn lại CARRY_CLEARANCE, và điểm trên khay cũng ở độ cao đó. Nhấc LIFT_HEIGHT như
+# cũ thì đáy lon đứng đang cầm (~10 cm trên mặt bàn) thấp hơn đỉnh lon đứng còn lại (11.8 cm), tay đi ngang qua nó
+CARRY_CORRIDOR = 0.15
+CARRY_CLEARANCE = 0.04
+# Lon đứng: điểm chờ lùi (dọc pháp tuyến lòng bàn tay, dọc ngón tay, lên cao) so với điểm gắp, thử lần lượt. Mặc định
+# lùi 7 cm theo pháp tuyến lòng bàn tay; khi gắp chéo người hướng đó chĩa về phía lon còn lại (cổ tay cách nó ~1 cm)
+# Lon nằm: kiểu gắp theo quy tắc cố định thay vì chi phí nhỏ nhất. Trục lon đối xứng nên có hai kiểu (trục cuộn ngón theo
+# chiều này hay chiều kia của trục lon, cổ tay khác nhau ~2 rad); chọn theo chi phí thì quanh chỗ hai chi phí bằng nhau
+# (Coca nằm cùng phía, yaw 90–120°) hai cảnh gần giống nhau cho hai kiểu, model lưỡng lự và đổi kiểu giữa chừng (MEMO
+# 5.0e, 5.2g). Ưu tiên kiểu có trục cuộn ngón hướng về phía góc tham chiếu (độ, khung world, từng tay); chỉ dùng kiểu còn
+# lại khi kiểu ưu tiên không lập được. Góc chọn từ 300 cảnh lon nằm (MEMO mục 5.2p): chi phí tăng TB 0.06–0.33, 1–2/75 cảnh
+# phải dùng kiểu còn lại. None: chọn theo chi phí như trước 25/09.
+LYING_MODE_REF_DEG = {"right": 125.0, "left": 215.0}
+# Lon nằm: số pose gắp đầu tiên (chi phí thấp nhất) được xét ở các mức khoảng hở > OTHER_CAN_MARGIN; pose xếp sau hay trượt
+LYING_CLEAR_GRASPS = 4
+# Ba điểm chờ cuối không lùi ngang theo lòng bàn tay (hạ thẳng từ trên, hoặc tiến dọc ngón tay): gắp chéo người thì bàn tay
+# chen giữa hai lon, hai lon cách nhau 5–10 cm thì mọi điểm chờ lùi ngang đều sát lon còn lại (thu được 0/50, MEMO 5.2q)
+UPRIGHT_PRE_OFFSETS = ((PRE_BACKOFF, PRE_BACK_ALONG_FINGERS, PRE_RISE), (0.04, 0.07, 0.03), (0.035, 0.03, 0.07),
+                       (0.0, 0.0, 0.09), (0.0, 0.08, 0.02), (0.015, 0.05, 0.05))
 
 
 class PlanningError(RuntimeError):
@@ -146,9 +175,11 @@ class PickPlacePlanner:
     """Lập quỹ đạo gắp lon `can` ('coke' tay phải, 'pepsi' tay trái, lon có thể ở bất kỳ nửa bàn nào) đặt vào khay
     cùng màu."""
 
-    def __init__(self, sim, can: str, waist_yaw: Optional[bool] = None):
-        """waist_yaw: cho IK dùng waist_yaw; mặc định (None) chỉ bật khi lon đang ở nửa bàn bên kia (gắp chéo người)."""
+    def __init__(self, sim, can: str, waist_yaw: Optional[bool] = None, hold_steps: Optional[int] = None):
+        """waist_yaw: cho IK dùng waist_yaw; mặc định (None) chỉ bật khi lon đang ở nửa bàn bên kia (gắp chéo người).
+        hold_steps: số bước 50 Hz đứng yên ở tư thế ready cuối episode (mặc định STEPS["hold"])."""
         m = sim.model
+        self.hold_steps = STEPS["hold"] if hold_steps is None else int(hold_steps)
         self.sim = sim
         self.can = can
         self.grasp = sim.grasps[can]
@@ -160,7 +191,22 @@ class PickPlacePlanner:
         # IK dùng bản sao model có geom_margin quanh lon còn lại (chỉ ảnh hưởng kiểm tra va chạm, không đổi vật lý sim)
         ik_model = copy.deepcopy(m)
         other_bid = sim.grasps["pepsi" if can == "coke" else "coke"]["can_bid"]
+        self.other_bid = other_bid
         ik_model.geom_margin[ik_model.geom_bodyid == other_bid] = OTHER_CAN_MARGIN
+        # Khoảng hở lớn hơn OTHER_CAN_MARGIN (APPROACH_MARGINS, CARRY_MARGINS) đo bằng mj_geomDistance: geom_margin với
+        # mesh (bàn tay) chỉ đúng một phần (lập với margin 5 cm, khoảng cách thật trên kế hoạch còn 3.2 cm)
+        collide = (ik_model.geom_contype != 0) | (ik_model.geom_conaffinity != 0)
+        self._other_geom_ids = np.flatnonzero(collide & (ik_model.geom_bodyid == other_bid))
+        shoulder = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, f"{side}_shoulder_pitch_link")
+        arm_body = np.zeros(m.nbody, dtype=bool)
+        for b in range(m.nbody):
+            a = b
+            while a > 0 and a != shoulder:
+                a = m.body_parentid[a]
+            arm_body[b] = a == shoulder
+        self._arm_geom_ids = np.flatnonzero(collide & arm_body[ik_model.geom_bodyid])
+        self._held_geom_ids = np.flatnonzero(collide & (ik_model.geom_bodyid == self.grasp["can_bid"]))
+        self._clearance = OTHER_CAN_MARGIN
         self.ik = ArmIK(ik_model, side, self.grasp["grasp_point"], use_waist_yaw=waist_yaw)
         # Pháp tuyến lòng bàn tay trong khung cổ tay: hướng từ lòng bàn tay vào tâm nắm (+y tay phải, -y tay trái)
         palm_sign = np.sign(self.grasp["grasp_point"][1])
@@ -191,6 +237,9 @@ class PickPlacePlanner:
         self.grasp_obstacles = everything & ~self.ik.body_mask([f"{can}_can", "work_table", f"{can}_tray"])
         self.carry_obstacles = everything & ~self.ik.body_mask([f"{can}_can", f"{can}_tray"])
 
+        self.phase = "plan"  # đoạn quỹ đạo đang chạy (để đo theo đoạn)
+        ref = LYING_MODE_REF_DEG and LYING_MODE_REF_DEG[side]
+        self.lying_mode_ref = None if ref is None else np.array([np.cos(np.radians(ref)), np.sin(np.radians(ref)), 0.0])
         self.info: Dict = {}  # thông tin kế hoạch (kiểu gắp, độ nghiêng bàn tay) để ghi log
         # Lon đang cầm (tham số attached của ArmIK.collides), để kiểm tra va chạm của cả lon khi mang/hạ lon: gắp chéo
         # người thì đường mang lon đi ngang trên lon còn lại
@@ -231,6 +280,38 @@ class PickPlacePlanner:
     def _is_cross(self, can_pos: np.ndarray) -> bool:
         """Lon ở nửa bàn bên kia so với tay gắp (tính theo pelvis)."""
         return bool((can_pos[1] - self.sim.data.xpos[self.pelvis_bid][1]) * self.side_y < 0)
+
+    def _set_margin(self, margin: float):
+        """Khoảng hở tối thiểu tới lon còn lại cho các kiểm tra va chạm từ giờ."""
+        self._clearance = margin
+
+    def _too_close(self) -> bool:
+        """Cánh tay (và lon đang cầm) trên self.ik.scratch (vừa được ArmIK.collides đặt tư thế) cách lon còn lại dưới
+        self._clearance."""
+        if self._clearance <= OTHER_CAN_MARGIN:
+            return False
+        m, d = self.ik.model, self.ik.scratch
+        other = d.xpos[self.other_bid]
+        if np.linalg.norm(d.xpos[self.grasp["wrist_bid"]] - other) > 0.45 + self._clearance:
+            return False  # cả cánh tay (vai tới đầu ngón ~0.45 m tính từ cổ tay về vai) ở xa
+        geoms = self._arm_geom_ids if self.attached is None else np.r_[self._arm_geom_ids, self._held_geom_ids]
+        for a in geoms:
+            for b in self._other_geom_ids:
+                if mujoco.mj_geomDistance(m, d, int(a), int(b), self._clearance, None) < self._clearance:
+                    return True
+        return False
+
+    def _carry_height(self, can_pos, tray_pos, held_half) -> Optional[float]:
+        """Độ cao tâm lon đang cầm để đáy lon cao hơn đỉnh lon còn lại CARRY_CLEARANCE, nếu lon còn lại nằm gần đường
+        mang lon (CARRY_CORRIDOR); None nếu không cần."""
+        d = self.sim.data
+        other = d.xpos[self.other_bid]
+        a, b = np.asarray(can_pos[:2]), np.asarray(tray_pos[:2])
+        t = np.clip((other[:2] - a) @ (b - a) / max((b - a) @ (b - a), 1e-9), 0.0, 1.0)
+        if np.linalg.norm(other[:2] - (a + t * (b - a))) > CARRY_CORRIDOR:
+            return None
+        other_half = CAN_RADIUS if is_lying(d.xmat[self.other_bid].reshape(3, 3)) else CAN_HALF_HEIGHT
+        return float(other[2] + other_half + CARRY_CLEARANCE + held_half)
 
     def _idle_q(self, waist_pitch: float) -> np.ndarray:
         return np.array([np.interp(waist_pitch, self.idle_waist, col) for col in self.idle_table.T])
@@ -311,13 +392,14 @@ class PickPlacePlanner:
             pos = can_pos + [0.0, 0.0, LYING_GRASP_HEIGHT]
             # Hướng gắp chuẩn là ràng buộc cứng, hoặc mềm (cho nghiêng, có phạt); trục lon đối xứng nên thử hai chiều;
             # trục cuộn ngón được lệch khỏi trục lon LYING_AXIS_OFFSETS (có phạt)
-            groups, group_cost = [], []
+            groups, group_cost, group_dir = [], [], []
             for s in (1, -1):
                 for off in LYING_AXIS_OFFSETS:
                     a = rot_z(off) @ (s * axis)
                     groups.append([axis_target(pos, [((0, 0, 1), a, 1.0), (self.lying_down_local, -UP, w)])
                                    for w in (1.0, 0.3)])
                     group_cost.append(LYING_AXIS_COST * abs(off))
+                    group_dir.append(s * axis)
         else:
             # Ngón tay hướng theo hướng vai -> lon. Lon ở nửa bàn bên kia (gắp chéo người) thì hướng từ vai gần như
             # nằm ngang, cổ tay chắn giữa hai lon và dễ quét trúng lon còn lại; thử thêm hướng từ tâm thân (ngón chĩa
@@ -330,19 +412,23 @@ class PickPlacePlanner:
             pos = can_pos + [0.0, 0.0, UPRIGHT_GRASP_HEIGHT]
             groups = []
             group_cost = [0.0] * len(origins)
+            group_dir = [None] * len(origins)
             for origin in origins:
                 reach = np.r_[can_pos[:2] - origin, 0.0]
                 reach /= np.linalg.norm(reach)
                 groups.append([axis_target(pos, [((0, 0, 1), UP, 1.0), ((1, 0, 0), reach, 0.2)])])
         grasps = []
-        for targets, extra in zip(groups, group_cost):
+        for targets, extra, finger_axis in zip(groups, group_cost, group_dir):
             r, cost = self._best(qpos, targets, seeds, self.grasp_obstacles,
                                  max_tilt=MAX_PALM_TILT if lying else None)
             if r is None:
                 continue
             cost += extra
             _, rot = self.ik.forward(qpos, r.q)
-            grasps.append((cost, {"q": r.q, "rot": rot, "pos": pos, "lying": lying,
+            # finger_axis (lon nằm): chiều trục lon mà trục cuộn ngón (z cổ tay) hướng theo, tức kiểu gắp; hai chiều
+            # ngược nhau cho hai tư thế cổ tay khác nhau ~2 rad (MEMO mục 5.0e)
+            grasps.append((cost, {"q": r.q, "rot": rot, "pos": pos, "lying": lying, "cost": cost,
+                                  "finger_axis": finger_axis,
                                   "tilt": self._palm_tilt(qpos, r.q) if lying else 0.0}))
         return [g for _, g in sorted(grasps, key=lambda c: c[0])]
 
@@ -356,7 +442,7 @@ class PickPlacePlanner:
         return ctrl.astype(np.float32)
 
     def _collides(self, qpos, q, obstacles) -> bool:
-        return self.ik.collides(qpos, q, obstacles, self.attached)
+        return self.ik.collides(qpos, q, obstacles, self.attached) or self._too_close()
 
     def _check(self, qpos, q, obstacles, what):
         if self._collides(qpos, q, obstacles):
@@ -407,6 +493,32 @@ class PickPlacePlanner:
             return path
         raise error
 
+    def _return_path(self, qpos, q_from) -> List[np.ndarray]:
+        """Từ q_from (tay đã rút lên khỏi khay) về điểm cao phía trên tư thế ready rồi hạ thẳng xuống.
+
+        Chỉ kiểm tra va chạm với thân robot: lúc này robot còn ngả về trước vì tay đang giơ xa (tới ~8°), nên tính với
+        pose pelvis hiện tại sẽ thấy bàn tay thấp và xa hơn thực tế, trúng cả lon trong khay."""
+        qpos_upright = qpos.copy()
+        qpos_upright[:7] = self.sim.model.qpos0[:7]
+        p_ready, rot_ready = self.ik.forward(qpos_upright, self.q_ready)
+        r = self.ik.solve(qpos_upright, rotation_target(p_ready + READY_RISE * UP, rot_ready), q_init=self.q_ready,
+                          q_nominal=self.q_ready)
+        q_high = r.q if r.pos_err < FREE_PATH_POS_TOL else self.q_ready
+        path = self._free_path(qpos, q_from, q_high, STEPS["return"], self.ik.robot_mask, what="về tư thế ready")
+        return path + [(1.0 - w) * q_high + w * self.q_ready for w in smoothstep(STEPS["settle"])]
+
+    def return_to_ready(self, ctrl_now: np.ndarray) -> List[np.ndarray]:
+        """Mục tiêu actuator 50 Hz đưa tay từ mục tiêu điều khiển hiện tại `ctrl_now` (đã nhả lon) nhấc thẳng lên
+        RETREAT_RISE rồi về tư thế ready như cuối targets(). Dùng khi ngừng gọi model sau khi đặt xong lon
+        (launch_vla_simulation.py --stop-on-success). Raises PlanningError nếu IK/va chạm không cho phép."""
+        qpos = self.sim.data.qpos.copy()
+        q_now = np.asarray(ctrl_now, dtype=np.float64)[self.ctrl_idx]
+        p0, rot_now = self.ik.forward(qpos, q_now)
+        path = self._pose_path(qpos, q_now, p0 + RETREAT_RISE * UP, rot_now, STEPS["retreat"], self.carry_obstacles,
+                               tol=FREE_PATH_POS_TOL, what="nhấc tay khỏi khay")
+        path += self._return_path(qpos, path[-1])
+        return [self._ctrl(q, 0.0) for q in path]
+
     def _servo(self, qpos_plan, path, grip, obstacles, point=None) -> Iterator[np.ndarray]:
         """Chạy lại đường đã lập nhưng bám pose trong khung world: mỗi bước giải lại IK với pose pelvis đo được lúc
         đó. Khi robot ngả người (eo cúi, tay vươn xa) pelvis dịch vài cm, nên cùng góc khớp thì bàn tay lệch khỏi lon;
@@ -414,6 +526,11 @@ class PickPlacePlanner:
         chỉnh: nếu eo bù theo độ ngả thì chính chuyển động eo lại làm thân lắc thêm (vòng phản hồi dao động)."""
         d = self.sim.data
         fixed = self.ik.waist_mask
+        names = self.ik.joint_names
+        yaw_free = None
+        if "waist_yaw_joint" in names:
+            yaw_free = fixed.copy()
+            yaw_free[names.index("waist_yaw_joint")] = False
         q = path[0]
         for q_plan in path:
             pos, rot = self.ik.forward(qpos_plan, q_plan, point)
@@ -422,20 +539,29 @@ class PickPlacePlanner:
             q_init[fixed] = q_plan[fixed]
             r = self.ik.solve(qpos, rotation_target(pos, rot), q_init=q_init, q_nominal=q_plan, point=point,
                               max_iters=30, fixed=fixed)
+            if r.pos_err >= PATH_POS_TOL and yaw_free is not None:
+                # Gắp chéo người với chân balance: pelvis xoay ngược chiều eo ~9°, tay vươn xa gần giới hạn không bù nổi
+                # (quay về tư thế đã lập thì bàn tay lệch ~5 cm, gắp trượt: MEMO mục 5.2q). Cho eo yaw bù thêm; eo pitch
+                # vẫn giữ nguyên
+                r2 = self.ik.solve(qpos, rotation_target(pos, rot), q_init=q_init, q_nominal=q_plan, point=point,
+                                   max_iters=30, fixed=yaw_free)
+                r = r2 if r2.pos_err < r.pos_err else r
             q = r.q if r.pos_err < PATH_POS_TOL and not self._collides(qpos, r.q, obstacles) else q_plan
             yield self._ctrl(q, grip)
         self._servo_last = q
 
-    def _descent(self, qpos, g):
-        """Đường từ điểm cao xuống điểm chờ rồi tiến vào lon, lập ngược từ tư thế gắp.
+    def _descent(self, qpos, g, pre_offset=(PRE_BACKOFF, PRE_BACK_ALONG_FINGERS, PRE_RISE)):
+        """Đường từ điểm cao xuống điểm chờ rồi tiến vào lon, lập ngược từ tư thế gắp. pre_offset: điểm chờ lùi
+        (dọc hướng tiếp cận, dọc ngón tay (chỉ lon đứng), lên cao) so với điểm gắp.
 
         Returns:
             (tư thế ở điểm cao, STEPS['descend'] + STEPS['approach'] tư thế tiếp theo, kết thúc ở tư thế gắp).
         """
         rot = g["rot"]
-        pre = g["pos"] - PRE_BACKOFF * (rot @ self._approach_local) + PRE_RISE * UP
+        back, along_fingers, rise = pre_offset
+        pre = g["pos"] - back * (rot @ self._approach_local) + rise * UP
         if not g["lying"]:
-            pre -= PRE_BACK_ALONG_FINGERS * rot[:, 0]
+            pre -= along_fingers * rot[:, 0]
         up1 = self._pose_path(qpos, g["q"], pre, rot, STEPS["approach"], self.grasp_obstacles, what="tiến vào lon")
         up2 = self._pose_path(qpos, up1[-1], pre + VIA_RISE * UP, rot, STEPS["descend"], self.grasp_obstacles,
                               tol=FREE_PATH_POS_TOL, what="hạ xuống điểm chờ")
@@ -454,26 +580,68 @@ class PickPlacePlanner:
         grasps = self.plan_grasps(qpos, d.xpos[can_bid].copy(), d.xmat[can_bid].reshape(3, 3).copy())
         if not grasps:
             raise PlanningError("không có tư thế gắp với tới được")
-        for g in grasps:
-            self._approach_local = self.lying_down_local if g["lying"] else self.palm_local
-            try:
-                q_via, descent = self._descent(qpos, g)
-                reach = self._free_path(qpos, self.q_ready, q_via, STEPS["reach"], self.free_obstacles,
-                                        what="vươn tay")
-                self._pose_path(qpos, g["q"], g["pos"] + LIFT_HEIGHT * UP, g["rot"], STEPS["lift"],
-                                self.grasp_obstacles, tol=FREE_PATH_POS_TOL, what="nhấc lon")
+        #    Lon nằm: kiểu gắp ưu tiên (LYING_MODE_REF_DEG) trước, rồi mới tới kiểu còn lại. Trong mỗi kiểu, khoảng hở tới
+        #    lon còn lại thử APPROACH_MARGINS từ lớn tới nhỏ, với mỗi mức thử mọi pose gắp và mọi điểm chờ
+        chosen, lift_ok = None, {}
+        mode_groups = [list(range(len(grasps)))]
+        if self.lying_mode_ref is not None and grasps[0]["lying"]:
+            pref = [i for i, g in enumerate(grasps) if g["finger_axis"] @ self.lying_mode_ref >= 0]
+            mode_groups = [pref, [i for i in range(len(grasps)) if i not in pref]]
+        for mode_rank, group in enumerate(mode_groups):
+          for margin in APPROACH_MARGINS:
+            for rank, gi in enumerate(group):
+                g = grasps[gi]
+                # Lon nằm: pose gắp xếp sau (chi phí cao) hay trượt khi khép tay; chỉ đổi lấy khoảng hở với vài pose đầu
+                if g["lying"] and rank >= LYING_CLEAR_GRASPS and margin > OTHER_CAN_MARGIN:
+                    continue
+                self._approach_local = self.lying_down_local if g["lying"] else self.palm_local
+                for pre_offset in ([None] if g["lying"] else UPRIGHT_PRE_OFFSETS):
+                    try:
+                        if gi not in lift_ok:  # đường nhấc lon xuất phát sát lon còn lại: chỉ cần OTHER_CAN_MARGIN
+                            self._set_margin(OTHER_CAN_MARGIN)
+                            lift_ok[gi] = None
+                            self._pose_path(qpos, g["q"], g["pos"] + LIFT_HEIGHT * UP, g["rot"], STEPS["lift"],
+                                            self.grasp_obstacles, tol=FREE_PATH_POS_TOL, what="nhấc lon")
+                            lift_ok[gi] = True
+                        if not lift_ok[gi]:
+                            raise PlanningError("tay va chạm khi nhấc lon")
+                        self._set_margin(margin)
+                        q_via, descent = (self._descent(qpos, g) if pre_offset is None
+                                          else self._descent(qpos, g, pre_offset))
+                        reach = self._free_path(qpos, self.q_ready, q_via, STEPS["reach"], self.free_obstacles,
+                                                what="vươn tay")
+                        chosen = (g, margin, pre_offset)
+                        break
+                    except PlanningError as e:
+                        error = e
+                if chosen:
+                    break
+            if chosen:
                 break
-            except PlanningError as e:
-                error = e
-        else:
+          if chosen:
+            break
+        # Lúc chạy (servo) và các đoạn sát lon còn lại dùng khoảng hở tối thiểu
+        self._set_margin(OTHER_CAN_MARGIN)
+        if not chosen:
             raise error
-        self.info.update(lying=g["lying"], palm_tilt_deg=float(np.degrees(g["tilt"])), grasp_q=g["q"])
+        g, margin, pre_offset = chosen
+        self.info.update(lying=g["lying"], palm_tilt_deg=float(np.degrees(g["tilt"])), grasp_q=g["q"],
+                         approach_margin_cm=round(margin * 100, 1),
+                         pre_offset=None if pre_offset is None else UPRIGHT_PRE_OFFSETS.index(pre_offset),
+                         wrist_pitch=round(float(g["q"][self.ik.joint_names.index(f"{self.ik.side}_wrist_pitch_joint")]), 3))
+        if g["lying"]:
+            a = g["finger_axis"]
+            self.info.update(finger_axis_deg=round(float(np.degrees(np.arctan2(a[1], a[0]))), 1),
+                             mode_fallback=bool(len(mode_groups) > 1 and mode_rank > 0))
+        self.phase = "reach"
         for q in reach:
             yield self._ctrl(q, 0.0)
 
         # 2. Hạ xuống và tiến vào lon, bám pose trong khung world theo pose pelvis hiện tại
+        self.phase = "approach"
         yield from self._servo(qpos, descent, 0.0, self.grasp_obstacles)
         q_now = self._servo_last
+        self.phase = "close"
         for w in smoothstep(STEPS["close"]):
             yield self._ctrl(q_now, w)
         if not sim.is_grasped(self.can):
@@ -485,47 +653,84 @@ class PickPlacePlanner:
         can_in_hand = w_rot.T @ (d.xpos[can_bid] - w_pos)
         self.attached = (can_bid, self.can_qadr, can_in_hand, w_rot.T @ d.xmat[can_bid].reshape(3, 3))
         p0, rot = self.ik.forward(qpos, q_now, can_in_hand)
-        path = self._pose_path(qpos, q_now, p0 + LIFT_HEIGHT * UP, rot, STEPS["lift"], self.grasp_obstacles,
-                               point=can_in_hand, tol=FREE_PATH_POS_TOL, what="nhấc lon")
+        # Lon còn lại gần đường mang lon: nhấc cao hơn đỉnh nó CARRY_CLEARANCE (tốc độ như nhấc LIFT_HEIGHT); không
+        # được thì nhấc LIFT_HEIGHT như cũ
+        half = CAN_RADIUS if g["lying"] else CAN_HALF_HEIGHT
+        high_z = self._carry_height(d.xpos[can_bid], d.xpos[self.tray_bid], half)
+        lifts = [LIFT_HEIGHT]
+        if high_z is not None and high_z - p0[2] > LIFT_HEIGHT:
+            lifts.insert(0, high_z - p0[2])
+        for lift in lifts:
+            try:
+                path = self._pose_path(qpos, q_now, p0 + lift * UP, rot, round(STEPS["lift"] * lift / LIFT_HEIGHT),
+                                       self.grasp_obstacles, point=can_in_hand, tol=FREE_PATH_POS_TOL, what="nhấc lon")
+                break
+            except PlanningError as e:
+                error = e
+        else:
+            raise error
+        self.info["lift_cm"] = round(lift * 100, 1)
+        self.phase = "lift"
         for q in path:
             yield self._ctrl(q, 1.0)
         q_now = path[-1]
 
         # 4. Mang tới trên khay: thử các góc xoay quanh trục đứng theo thứ tự chi phí tăng dần, lấy góc đầu tiên mà
         #    tư thế trên khay, tư thế đặt, đường mang lon và đường hạ lon đều hợp lệ
+        #    Lon còn lại gần đường mang lon: điểm trên khay ở độ cao đã nhấc, đường mang lon kiểm tra với CARRY_MARGINS từ
+        #    lớn tới nhỏ; cuối cùng thử điểm trên khay ABOVE_TRAY với OTHER_CAN_MARGIN như cũ
         qpos = d.qpos.copy()
         tray = d.xpos[self.tray_bid]
-        half = CAN_RADIUS if g["lying"] else CAN_HALF_HEIGHT
         place = np.array([tray[0] - PLACE_TOWARD_ROBOT, tray[1],
                           tray[2] + TRAY_BASE_HALF_THICKNESS + half + PLACE_CLEARANCE])
-        above = place + ABOVE_TRAY * UP
-        candidates = []
-        for yaw in PLACE_YAWS:
-            rot_p = rot_z(yaw) @ rot
-            r_above, _ = self._best(qpos, [rotation_target(above, rot_p)], [q_now] + self._seed_postures(qpos),
-                                    self.carry_obstacles, can_in_hand)
-            if r_above is not None:
-                candidates.append((r_above.posture_cost + 0.3 * abs(yaw), rot_p, r_above.q))
-        for _, rot_p, q_above in sorted(candidates, key=lambda c: c[0]):
-            try:
-                carry = self._free_path(qpos, q_now, q_above, STEPS["carry"], self.carry_obstacles, can_in_hand,
-                                        what="mang lon")
-                lower = self._pose_path(qpos, q_above, place, rot_p, STEPS["lower"], self.carry_obstacles,
-                                        point=can_in_hand, what="hạ lon")
+        options = []
+        if high_z is not None and high_z > place[2] + ABOVE_TRAY:
+            options += [(high_z - place[2], m) for m in CARRY_MARGINS[:-1]]
+        options.append((ABOVE_TRAY, OTHER_CAN_MARGIN))
+        plan = None
+        for above_h, margin in options:
+            self._set_margin(margin)
+            above = place + above_h * UP
+            candidates = []
+            for yaw in PLACE_YAWS:
+                rot_p = rot_z(yaw) @ rot
+                r_above, _ = self._best(qpos, [rotation_target(above, rot_p)], [q_now] + self._seed_postures(qpos),
+                                        self.carry_obstacles, can_in_hand)
+                if r_above is not None:
+                    candidates.append((r_above.posture_cost + 0.3 * abs(yaw), rot_p, r_above.q))
+            for _, rot_p, q_above in sorted(candidates, key=lambda c: c[0]):
+                try:
+                    self._set_margin(margin)
+                    carry = self._free_path(qpos, q_now, q_above, STEPS["carry"], self.carry_obstacles, can_in_hand,
+                                            what="mang lon")
+                    # Hạ xuống khay thì lon còn lại có thể nằm sát khay: chỉ cần OTHER_CAN_MARGIN
+                    self._set_margin(OTHER_CAN_MARGIN)
+                    lower = self._pose_path(qpos, q_above, place, rot_p,
+                                            max(STEPS["lower"], round(STEPS["lower"] * above_h / ABOVE_TRAY)),
+                                            self.carry_obstacles, point=can_in_hand, what="hạ lon")
+                    plan = (carry, lower, above_h, margin)
+                    break
+                except PlanningError:
+                    continue
+            if plan:
                 break
-            except PlanningError:
-                continue
-        else:
+        self._set_margin(OTHER_CAN_MARGIN)
+        if plan is None:
             raise PlanningError("không đặt được lon vào khay")
+        carry, lower, above_h, margin = plan
+        self.info.update(carry_margin_cm=round(margin * 100, 1), above_tray_cm=round(above_h * 100, 1))
+        self.phase = "carry"
         for q in carry:
             yield self._ctrl(q, 1.0)
 
         # 5. Hạ xuống (servo theo pose pelvis hiện tại), thả lon
+        self.phase = "lower"
         yield from self._servo(qpos, lower, 1.0, self.carry_obstacles, point=can_in_hand)
         q_now = self._servo_last
         for w in smoothstep(STEPS["release"]):
             yield self._ctrl(q_now, 1.0 - w)
         self.attached = None
+        self.phase = "retreat"
 
         # 6. Rút tay ra ngược hướng tiếp cận và lên cao, rồi về tư thế ready (lập từ trạng thái sau khi rút tay, lúc
         #    lon đã nằm yên trong khay)
@@ -536,19 +741,7 @@ class PickPlacePlanner:
                                tol=FREE_PATH_POS_TOL, what="rút tay")
         for q in path:
             yield self._ctrl(q, 0.0)
-        # Về điểm cao phía trên tư thế ready rồi hạ thẳng xuống. Chỉ kiểm tra va chạm với thân robot: lúc này robot
-        # còn ngả về trước vì tay đang giơ xa (tới ~8°), nên tính với pose pelvis hiện tại sẽ thấy bàn tay thấp và
-        # xa hơn thực tế, trúng cả lon trong khay
-        qpos = d.qpos.copy()
-        qpos_upright = qpos.copy()
-        qpos_upright[:7] = self.sim.model.qpos0[:7]
-        p_ready, rot_ready = self.ik.forward(qpos_upright, self.q_ready)
-        r = self.ik.solve(qpos_upright, rotation_target(p_ready + READY_RISE * UP, rot_ready), q_init=self.q_ready,
-                          q_nominal=self.q_ready)
-        q_high = r.q if r.pos_err < FREE_PATH_POS_TOL else self.q_ready
-        path = self._free_path(qpos, path[-1], q_high, STEPS["return"], self.ik.robot_mask, what="về tư thế ready")
-        path += [(1.0 - w) * q_high + w * self.q_ready for w in smoothstep(STEPS["settle"])]
-        for q in path:
+        for q in self._return_path(d.qpos.copy(), path[-1]):
             yield self._ctrl(q, 0.0)
-        for _ in range(STEPS["hold"]):
+        for _ in range(self.hold_steps):
             yield self._ctrl(self.q_ready, 0.0)

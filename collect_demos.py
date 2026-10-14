@@ -54,6 +54,8 @@ VIDEO_KEY = "observation.images.ego_view"
 CAN_HALF_LENGTH = 0.061
 # Khoảng hở tối thiểu giữa lon và thành khay (m)
 TRAY_MARGIN = 0.01
+DONE_SECONDS = 4.0       # độ dài episode "đã xong"
+DONE_TRAY_JITTER = 0.03  # episode "đã xong": lệch tối đa của lon so với tâm khay (m)
 
 
 def _task_can(task: str):
@@ -157,18 +159,39 @@ def sample_randomization(task: str, seed: int, cfg: dict) -> dict:
             cans[c] = {"pos": np.array([x, y, z]), "quat": can_quat(lying, yaw), "lying": lying, "yaw": yaw}
 
     joints = {side: rng.normal(0.0, cfg["joint_noise"], 7) for side in ("left", "right")}
-    return {"tray": tray, "cans": cans, "joints": joints, "swapped": swapped}
+    rand = {"tray": tray, "cans": cans, "joints": joints, "swapped": swapped, "done": False}
+    # Episode "đã xong" (cfg["done_prob"]): lon nhiệm vụ nằm sẵn trong khay đích, robot chỉ đứng yên. Bộ sinh số riêng theo
+    # seed để mọi số ngẫu nhiên ở trên giữ nguyên (cảnh của dataset cũ và của episode thường không đổi)
+    if cfg.get("done_prob", 0.0) > 0:
+        rng_done = np.random.default_rng([seed, 7])
+        if rng_done.random() < cfg["done_prob"]:
+            rand["done"] = True
+            rand["done_offset"] = rng_done.uniform(-DONE_TRAY_JITTER, DONE_TRAY_JITTER, 2)
+    return rand
+
+
+GROUPS = ("cùng phía đứng", "cùng phía nằm", "đổi phía đứng", "đổi phía nằm")
+
+
+def scene_group(task: str, seed: int, cfg: dict) -> str:
+    """Nhóm của cảnh (một trong GROUPS, hoặc "đã xong"), biết trước khi chạy."""
+    rand = sample_randomization(task, seed, cfg)
+    if rand["done"]:
+        return "đã xong"
+    can = rand["cans"][_task_can(task)[0]]
+    return f"{'đổi phía' if rand['swapped'] else 'cùng phía'} {'nằm' if can['lying'] else 'đứng'}"
 
 
 def setup_episode(task: str, seed: int, cfg: dict, pipeline_kwargs: Optional[dict] = None):
     """Tạo pipeline và áp dụng ngẫu nhiên hoá của episode (tái tạo được từ task + seed + cfg).
 
-    pipeline_kwargs: tham số thêm cho ClosedLoopVLAPipeline (ví dụ policy_mode="remote" khi đánh giá model).
+    pipeline_kwargs: tham số thêm cho ClosedLoopVLAPipeline (ví dụ policy_mode="remote" khi đánh giá model). Chế độ
+    chân lấy từ cfg["lower_body"] (dataset trước 25/09 không có khoá này: "fixed"), trừ khi pipeline_kwargs ghi đè.
     """
 
     from bridge.closed_loop_pipeline import ClosedLoopVLAPipeline
 
-    kwargs = {"policy_mode": "standalone", **(pipeline_kwargs or {})}
+    kwargs = {"policy_mode": "standalone", "lower_body": cfg.get("lower_body", "fixed"), **(pipeline_kwargs or {})}
     with contextlib.redirect_stdout(io.StringIO()):
         pipe = ClosedLoopVLAPipeline(task_prompt=TASKS[task], **kwargs)
     return pipe, apply_randomization(pipe, task, sample_randomization(task, seed, cfg))
@@ -196,6 +219,14 @@ def apply_randomization(pipe, task: str, rand: dict) -> dict:
     for c in (can, other):
         d.qpos[can_adr[c]:can_adr[c] + 3] = rand["cans"][c]["pos"]
         d.qpos[can_adr[c] + 3:can_adr[c] + 7] = rand["cans"][c]["quat"]
+    if rand.get("done"):
+        # Lon nhiệm vụ nằm sẵn trong khay đích (giữ đứng/nằm và hướng như đã lấy mẫu)
+        from sim.pick_place_planner import TRAY_BASE_HALF_THICKNESS
+        v = rand["cans"][can]
+        half = CAN_RADIUS if v["lying"] else CAN_HALF_HEIGHT
+        tray_pos = m.body_pos[tray_bid]
+        d.qpos[can_adr[can]:can_adr[can] + 2] = tray_pos[:2] + rand["done_offset"]
+        d.qpos[can_adr[can] + 2] = tray_pos[2] + TRAY_BASE_HALF_THICKNESS + half + 0.0005
     for side in ("left", "right"):
         d.qpos[sim.act_qposadr[adapter.arm_idx[side]]] += rand["joints"][side]
     mujoco.mj_forward(m, d)
@@ -203,8 +234,8 @@ def apply_randomization(pipe, task: str, rand: dict) -> dict:
             "other_start": d.qpos[can_adr[other]:can_adr[other] + 3].copy()}
 
 
-def is_success(pipe, ctx) -> bool:
-    """Lon nằm trong đúng khay, đã nhả, và lon còn lại không bị xô lệch quá 3 cm."""
+def is_success(pipe, ctx, check_other: bool = True) -> bool:
+    """Lon nằm trong đúng khay, đã nhả, và lon còn lại không bị xô lệch quá 3 cm (check_other=False: bỏ điều kiện cuối)."""
     d = pipe.sim.data
     can_adr, can, other = ctx["can_adr"], ctx["can"], ctx["other"]
     can_pos = d.qpos[can_adr[can]:can_adr[can] + 3]
@@ -213,29 +244,37 @@ def is_success(pipe, ctx) -> bool:
         np.all(np.abs(can_pos[:2] - tray_pos[:2]) < 0.08)
         and can_pos[2] < tray_pos[2] + 0.1
         and not pipe.sim.is_grasped(can)
-        and np.linalg.norm(d.qpos[can_adr[other]:can_adr[other] + 3] - ctx["other_start"]) < 0.03
+        and (not check_other or np.linalg.norm(d.qpos[can_adr[other]:can_adr[other] + 3] - ctx["other_start"]) < 0.03)
     )
 
 
-def replay_actions(task: str, seed: int, cfg: dict, actions: np.ndarray):
+def replay_actions(task: str, seed: int, cfg: dict, actions: np.ndarray, observer=None,
+                   pipeline_kwargs: Optional[dict] = None):
     """Phát lại action [N, 53] qua đường chạy model từ cùng trạng thái đầu của episode.
+
+    observer: tuỳ chọn, hàm observer(pipe, ctx) trả về hàm gọi sau mỗi bước sim với mục tiêu ctrl của bước đó
+    (ví dụ sim.episode_metrics.EpisodeMetrics). pipeline_kwargs: như setup_episode (ví dụ lower_body="balance" để phát
+    lại demo fixed với chân tự cân bằng).
 
     Returns:
         (thành công, state đo được tại mỗi khung [N, 49]).
     """
-    pipe, ctx = setup_episode(task, seed, cfg)
+    pipe, ctx = setup_episode(task, seed, cfg, pipeline_kwargs)
     sim, adapter = pipe.sim, pipe.g1_adapter
     layout, _ = modality_layout(ACTION_KEYS, ACTION_DIMS)
     action_dict = {k: actions[:, v["start"]:v["end"]] for k, v in layout.items()}
     ctrl = adapter.action_to_ctrl(action_dict, sim.default_ctrl, ACTION_HZ, pipe.control_hz)
     # Giữ mục tiêu cuối thêm một bước cho đủ độ dài episode gốc (chunk nội suy ngắn hơn 1 bước)
     ctrl = np.concatenate([ctrl, ctrl[-1:]])
+    on_step = observer(pipe, ctx) if observer else None
     states = []
     for i, target in enumerate(ctrl):
         if i % CONTROL_STEPS_PER_FRAME == 0:
             state = adapter.state(sim.data, sim.act_qposadr)
             states.append(np.concatenate([state[k] for k in STATE_KEYS]))
-        sim.step(pipe.wbc.track_joint_targets(target), n_substeps=pipe.substeps_per_wbc)
+        sim.step(pipe._lower_body(pipe.wbc.track_joint_targets(target)), n_substeps=pipe.substeps_per_wbc)
+        if on_step:
+            on_step(target)
     ok = is_success(pipe, ctx)
     pipe.close()
     return ok, np.asarray(states, np.float32)
@@ -250,6 +289,7 @@ def run_episode(job):
     import mujoco
     from PIL import Image
 
+    from sim.episode_metrics import EpisodeMetrics
     from sim.pick_place_planner import PickPlacePlanner, PlanningError
 
     task, seed, cfg, tmp_dir = job
@@ -257,29 +297,49 @@ def run_episode(job):
     sim, adapter = pipe.sim, pipe.g1_adapter
     d = sim.data
     scratch = mujoco.MjData(sim.model)
-    planner = PickPlacePlanner(sim, ctx["can"])
-    frames, states, actions = [], [], []
+    # Dataset cũ không có hold_seconds trong cfg: 0.7 s như trước
     rand = sample_randomization(task, seed, cfg)
-    base = {"task": task, "seed": seed, "lying": rand["cans"][ctx["can"]]["lying"], "swapped": rand["swapped"]}
+    base = {"task": task, "seed": seed, "lying": rand["cans"][ctx["can"]]["lying"], "swapped": rand["swapped"],
+            "done": rand["done"]}
+    if rand["done"]:
+        # Việc đã xong: về tư thế ready (tay đang lệch joint_noise) rồi đứng yên, để model học không gắp lại lon trong khay
+        planner = None
+        targets = iter([sim.default_ctrl.astype(np.float32)] * round(cfg.get("done_seconds", DONE_SECONDS) * 50))
+    else:
+        planner = PickPlacePlanner(sim, ctx["can"], hold_steps=round(cfg.get("hold_seconds", 0.7) * 50))
+        targets = planner.targets()
+    metrics = EpisodeMetrics(sim, ctx["can"], ctx["other"])
+    frames, states, actions = [], [], []
     try:
         # Generator lập kế hoạch từng đoạn từ trạng thái hiện tại: mục tiêu của bước k tính từ trạng thái trước bước k
-        for step, target in enumerate(planner.targets()):
+        for step, target in enumerate(targets):
             record = step % CONTROL_STEPS_PER_FRAME == 0
             if record:
                 img = Image.fromarray(sim.render_camera("ego_view")).resize(IMAGE_SIZE, Image.BOX)
                 frames.append(np.asarray(img))
                 state = adapter.state(d, sim.act_qposadr)
                 states.append(np.concatenate([state[k] for k in STATE_KEYS]))
-            sim.step(pipe.wbc.track_joint_targets(target), n_substeps=pipe.substeps_per_wbc)
+            sim.step(pipe._lower_body(pipe.wbc.track_joint_targets(target)), n_substeps=pipe.substeps_per_wbc)
+            metrics.step(target)
+            # Loại sớm demo vi phạm ngưỡng chất lượng (sim/episode_metrics.py); ngưỡng thân chỉ với chân balance
+            bad = metrics.violation(body=pipe.balance is not None) if cfg.get("quality_filter") else None
+            if bad:
+                pipe.close()
+                return {**base, "ok": False, "reason": f"chất lượng: {bad}", "quality": metrics.result()}
             if record:
                 action = adapter.action_from_ctrl(d, sim.act_qposadr, pipe.wbc.last_target, scratch)
                 actions.append(np.concatenate([action[k] for k in ACTION_KEYS]))
     except PlanningError as e:
         pipe.close()
-        return {**base, "ok": False, "reason": f"IK/gắp: {e}"}
+        return {**base, "ok": False, "reason": f"IK/gắp: {e}", "quality": metrics.result()}
 
     success = is_success(pipe, ctx)
     pipe.close()
+    base["quality"] = metrics.result()
+    # Lựa chọn của planner: khoảng hở tới lon còn lại lúc tiến vào / mang lon, độ cao nhấc lon, điểm trên khay
+    base["plan"] = {} if planner is None else {k: planner.info[k] for k in ("approach_margin_cm", "pre_offset", "lift_cm", "carry_margin_cm",
+                                                "above_tray_cm", "wrist_pitch", "finger_axis_deg", "mode_fallback")
+                    if k in planner.info}
     if not success:
         return {**base, "ok": False, "reason": "đặt lon không thành công"}
     if not replay_actions(task, seed, cfg, np.asarray(actions, np.float32))[0]:
@@ -289,7 +349,7 @@ def run_episode(job):
     write_video(frames, stem.with_suffix(".mp4"))
     np.savez(stem.with_suffix(".npz"), state=np.asarray(states, np.float32), action=np.asarray(actions, np.float32))
     return {**base, "ok": True, "stem": str(stem), "length": len(frames),
-            "palm_tilt_deg": round(planner.info.get("palm_tilt_deg", 0.0), 1)}
+            "palm_tilt_deg": 0.0 if planner is None else round(planner.info.get("palm_tilt_deg", 0.0), 1)}
 
 
 def write_video(frames, path: Path):
@@ -335,7 +395,7 @@ def modality_layout(keys, dims):
     return layout, start
 
 
-def write_meta(out: Path, episodes, cfg: dict):
+def write_meta(out: Path, episodes, cfg: dict, rejected=()):
     meta = out / "meta"
     meta.mkdir(parents=True, exist_ok=True)
     task_names = list(TASKS.values())
@@ -350,13 +410,20 @@ def write_meta(out: Path, episodes, cfg: dict):
             f.write(json.dumps({"episode_index": i, "tasks": [TASKS[ep["task"]]], "length": ep["length"]}) + "\n")
 
     # Seed và cấu hình ngẫu nhiên hoá của từng episode, để tái tạo trạng thái đầu khi phát lại (verify_demos.py);
-    # kèm tư thế lon cần gắp, lon có đổi phía không và độ nghiêng lòng bàn tay lúc gắp để tiện phân tích
+    # kèm tư thế lon cần gắp, lon có đổi phía không, độ nghiêng lòng bàn tay lúc gắp và chỉ số chất lượng
+    # (sim/episode_metrics.py, đo lúc thu) để tiện phân tích
     with open(meta / "collection.jsonl", "w") as f:
         for i, ep in enumerate(episodes):
             f.write(json.dumps({
                 "episode_index": i, "task": ep["task"], "seed": ep["seed"], "cfg": cfg,
                 "lying": ep["lying"], "swapped": ep["swapped"], "palm_tilt_deg": ep["palm_tilt_deg"],
-            }) + "\n")
+                "quality": ep["quality"], "plan": ep.get("plan"), "done": ep.get("done", False),
+            }, ensure_ascii=False) + "\n")
+    # Mọi lần thử bị bỏ, kèm lý do và chỉ số đo được tới lúc dừng, để biết planner hay bỏ nhóm cảnh nào và vì sao
+    with open(meta / "rejected.jsonl", "w") as f:
+        for r in rejected:
+            f.write(json.dumps({k: r[k] for k in ("task", "seed", "lying", "swapped", "reason", "quality") if k in r},
+                               ensure_ascii=False) + "\n")
 
     modality = {
         "state": state_layout,
@@ -428,8 +495,28 @@ def main():
     parser.add_argument("--can-gap", type=float, default=0.03, help="Khoảng hở tối thiểu giữa hai lon (m)")
     parser.add_argument("--tray-jitter", type=float, default=0.02, help="Lệch tối đa vị trí khay đích (m)")
     parser.add_argument("--joint-noise", type=float, default=0.05, help="Độ lệch chuẩn nhiễu khớp tay ban đầu (rad)")
+    parser.add_argument("--hold-seconds", type=float, default=2.5,
+                        help="Đứng yên ở tư thế ready cuối episode (s), để model học dừng lại sau khi xong việc. "
+                             "Dataset trước 25/09 dùng 0.7 s")
+    parser.add_argument("--group-quota", type=int, default=0,
+                        help="Mỗi lon N episode cho từng nhóm đứng/nằm × cùng/đổi phía (thay --episodes-per-task); "
+                             "chỉ chạy seed thuộc nhóm còn thiếu. Nên đặt --swap-prob/--lying-prob 0.5 để nhóm nào cũng "
+                             "có nhiều seed")
+    parser.add_argument("--done-per-task", type=int, default=0,
+                        help="Với --group-quota: số episode 'đã xong' mỗi lon (cần --done-prob > 0)")
+    parser.add_argument("--done-prob", type=float, default=0.0,
+                        help="Tỉ lệ episode 'đã xong': lon nhiệm vụ nằm sẵn trong khay, robot về ready rồi đứng yên "
+                             f"{DONE_SECONDS:g} s (dạy model không gắp lại lon đã đặt)")
+    parser.add_argument("--quality-filter", action=argparse.BooleanOptionalAction, default=True,
+                        help="Loại demo sát/chạm lon còn lại (< 1 cm), và với chân balance: thân chạm bàn, ngả > 5°, bàn "
+                             "chân xoay > 5° (sim/episode_metrics.py). Dataset trước 25/09 không lọc")
+    parser.add_argument("--lower-body", choices=["fixed", "balance"], default="fixed",
+                        help="Chân khoá cứng (như dataset trước 25/09) hoặc policy thăng bằng NVIDIA điều khiển chân + eo. "
+                             "Ghi vào cfg để phát lại/đánh giá dùng đúng chế độ")
     args = parser.parse_args()
 
+    if args.done_per_task and args.done_prob <= 0:
+        sys.exit("--done-per-task cần --done-prob > 0")
     out = Path(args.out)
     if out.exists():
         sys.exit(f"Thư mục {out} đã tồn tại; chọn --out khác hoặc xoá thư mục cũ.")
@@ -437,43 +524,67 @@ def main():
     tmp_dir.mkdir(parents=True)
     cfg = {"can_x": args.can_x, "can_y": args.can_y, "lying_prob": args.lying_prob, "can_gap": args.can_gap,
            "tray_jitter": args.tray_jitter, "joint_noise": args.joint_noise, "swap_prob": args.swap_prob,
-           "cross_can_y": args.cross_can_y}
+           "cross_can_y": args.cross_can_y, "hold_seconds": args.hold_seconds, "lower_body": args.lower_body,
+           "quality_filter": args.quality_filter, "done_prob": args.done_prob}
 
-    # Chạy xen kẽ hai nhiệm vụ; số lần thử mỗi đợt ước theo tỉ lệ thành công đã đo để bù episode thất bại
-    kept = {t: [] for t in TASKS}
-    attempts = {t: 0 for t in TASKS}
-    # Thống kê theo (lon, đứng/nằm): số lần thử, số lần thành công, lý do thất bại
+    # Chỉ tiêu: mặc định --episodes-per-task mỗi lon (một nhóm "tất cả"); với --group-quota N thì mỗi lon N episode cho
+    # từng nhóm đứng/nằm × cùng/đổi phía, cộng --done-per-task episode "đã xong". Nhóm của một seed biết trước từ
+    # sample_randomization, nên chỉ chạy seed thuộc nhóm còn thiếu; số lần thử mỗi đợt ước theo tỉ lệ thu được đã đo
+    if args.group_quota:
+        quota = {(t, g): args.group_quota for t in TASKS for g in GROUPS}
+        quota.update({(t, "đã xong"): args.done_per_task for t in TASKS if args.done_per_task})
+    else:
+        quota = {(t, "tất cả"): args.episodes_per_task for t in TASKS}
+    group_of = (lambda t, sd: scene_group(t, sd, cfg)) if args.group_quota else (lambda t, sd: "tất cả")
+    kept = {k: [] for k in quota}
+    rejected = []
+    attempts = collections.Counter()
+    # Thống kê theo (lon, nhóm): số lần thử, số lần thành công, lý do thất bại
     stats = collections.defaultdict(lambda: {"tries": 0, "ok": 0, "fail": collections.Counter()})
     seed = args.seed
     t0 = time.time()
     # Mỗi tiến trình chỉ chạy một episode rồi thoát: tạo pipeline lặp lại trong cùng tiến trình rò rỉ
     # ~150 MB mỗi episode (model MuJoCo, renderer EGL, ONNX session) và làm tràn RAM
     with Pool(args.workers, maxtasksperchild=1) as pool:
-        while any(len(kept[t]) < args.episodes_per_task for t in TASKS):
-            jobs = []
-            for t in TASKS:
-                need = args.episodes_per_task - len(kept[t])
-                rate = len(kept[t]) / attempts[t] if attempts[t] >= 20 else 0.5
-                for _ in range(int(np.ceil(need / max(rate, 0.2) * 1.1)) if need > 0 else 0):
-                    jobs.append((t, seed, cfg, str(tmp_dir)))
-                    seed += 1
+        while any(len(kept[k]) < quota[k] for k in quota):
+            want = {}
+            for k in quota:
+                need = quota[k] - len(kept[k])
+                # Đợt đầu chưa đo được tỉ lệ: giả định 0.7 (planner sau 25/09 thu được 79–95% mỗi nhóm); 0.5 làm đợt đầu
+                # chạy gần gấp đôi số lần thử cần thiết
+                rate = len(kept[k]) / attempts[k] if attempts[k] >= 10 else 0.7
+                want[k] = int(np.ceil(need / max(rate, 0.2) * 1.1)) if need > 0 else 0
+            jobs, scanned = [], 0
+            while any(want.values()):
+                scanned += 1
+                if scanned > 100000:
+                    sys.exit(f"Không tìm được seed cho nhóm {[k for k, n in want.items() if n]} sau 100000 seed; "
+                             "kiểm tra --swap-prob/--lying-prob/--done-prob")
+                for t in TASKS:
+                    k = (t, group_of(t, seed))
+                    if want.get(k, 0) > 0:
+                        jobs.append((t, seed, cfg, str(tmp_dir)))
+                        want[k] -= 1
+                seed += 1
             for res in pool.imap(run_episode, jobs):
-                attempts[res["task"]] += 1
-                st = stats[(res["task"], ("nằm" if res["lying"] else "đứng") + (", đổi phía" if res["swapped"] else ""))]
+                k = (res["task"], group_of(res["task"], res["seed"]))
+                attempts[k] += 1
+                st = stats[k]
                 st["tries"] += 1
                 if not res["ok"]:
                     st["fail"][res["reason"].split(" (")[0]] += 1
+                    rejected.append(res)
                     continue
                 st["ok"] += 1
-                if len(kept[res["task"]]) < args.episodes_per_task:
-                    kept[res["task"]].append(res)
-            print(
-                f"[{time.time() - t0:5.0f}s] "
-                + " | ".join(f"{t}: {len(kept[t])}/{args.episodes_per_task} (thử {attempts[t]})" for t in TASKS)
-            )
+                if len(kept[k]) < quota[k]:
+                    kept[k].append(res)
+            print(f"[{time.time() - t0:5.0f}s] " + " | ".join(
+                f"{t} {g}: {len(kept[(t, g)])}/{quota[(t, g)]} (thử {attempts[(t, g)]})" for t, g in quota))
 
-    # Đánh số episode liên tục, xen kẽ hai nhiệm vụ
-    episodes = [ep for pair in zip(*(sorted(kept[t], key=lambda e: e["seed"]) for t in TASKS)) for ep in pair]
+    # Đánh số episode liên tục, xen kẽ hai nhiệm vụ (mỗi lon cùng số episode)
+    per_task = {t: sorted((ep for (tt, _), eps in kept.items() if tt == t for ep in eps), key=lambda e: e["seed"])
+                for t in TASKS}
+    episodes = [ep for pair in zip(*per_task.values()) for ep in pair]
     data_dir = out / "data" / "chunk-000"
     video_dir = out / "videos" / "chunk-000" / VIDEO_KEY
     data_dir.mkdir(parents=True)
@@ -492,15 +603,16 @@ def main():
     sample = np.load(episodes[0]["stem"] + ".npz")
     assert sample["state"].shape[1] == sum(STATE_DIMS.values())
     assert sample["action"].shape[1] == sum(ACTION_DIMS.values())
-    write_meta(out, episodes, cfg)
+    write_meta(out, episodes, cfg, rejected)
     shutil.rmtree(tmp_dir)
 
     print(f"\nĐã ghi {len(episodes)} episode ({global_start} khung hình) vào {out}")
     lying = sum(ep["lying"] for ep in episodes)
-    print(f"Lon cần gắp: {len(episodes) - lying} đứng, {lying} nằm; {sum(ep['swapped'] for ep in episodes)} đổi phía")
+    print(f"Lon cần gắp: {len(episodes) - lying} đứng, {lying} nằm; {sum(ep['swapped'] for ep in episodes)} đổi phía; "
+          f"{sum(ep.get('done', False) for ep in episodes)} đã xong")
     print("Tỉ lệ thành công khi thu:")
-    for (t, pose), st in sorted(stats.items()):
-        print(f"  {t:5s} {pose}: {st['ok']}/{st['tries']}")
+    for (t, group), st in sorted(stats.items()):
+        print(f"  {t:5s} {group}: {st['ok']}/{st['tries']}")
         for reason, n in st["fail"].most_common():
             print(f"      {n:4d} x {reason}")
 

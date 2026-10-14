@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1290 780" width="1290" height="780" font-family="'DejaVu Sans', 'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-size: 21px; font-weight: 700; fill: #0f172a; }
+      .sub { font-size: 13px; fill: #64748b; }
+      .h { font-size: 16px; font-weight: 700; fill: #0f172a; }
+      .tag { font-size: 12px; fill: #475569; }
+      .t { font-size: 13px; fill: #1e293b; }
+      .n { font-size: 12px; fill: #64748b; }
+      .lab { font-size: 11px; font-weight: 700; fill: #64748b; letter-spacing: 1px; }
+      .c { font-size: 12.5px; fill: #0f172a; }
+      .edge { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arr); }
+      .el { font-size: 13px; font-weight: 700; fill: #334155; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1290" height="780" fill="#ffffff"/>
+
+  <text x="645" y="34" text-anchor="middle" class="title">π0.7 lúc chạy: 3 mô hình, mỗi mô hình một nhịp</text>
+  <text x="645" y="56" text-anchor="middle" class="sub">Các khối chạy bất đồng bộ; VLA luôn lấy subtask ℓ̂ và ảnh subgoal g* mới nhất đang có. Màu của mỗi tín hiệu giữ nguyên trong cả hình.</text>
+
+  <!-- Row 1: inputs -->
+  <text x="45" y="82" class="lab">ĐẦU VÀO: 4 LOẠI, ĐẾN TỪ 3 NGUỒN KHÁC NHAU</text>
+  <rect x="45" y="90" width="270" height="36" rx="8" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="180" y="113" text-anchor="middle" class="c">ℓ · lệnh task: “clean the kitchen”</text>
+  <rect x="327" y="90" width="270" height="36" rx="8" fill="#ccfbf1" stroke="#0f766e"/>
+  <text x="462" y="113" text-anchor="middle" class="c">o_t, q_t · ≤4 camera + góc khớp</text>
+  <rect x="609" y="90" width="270" height="36" rx="8" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="744" y="113" text-anchor="middle" class="c">m · Speed, Quality=5, Mistake=false</text>
+  <rect x="891" y="90" width="264" height="36" rx="8" fill="#e2e8f0" stroke="#475569"/>
+  <text x="1023" y="113" text-anchor="middle" class="c">c · control mode: joint | ee</text>
+
+  <text x="180" y="143" text-anchor="middle" class="n">↑ người dùng ra lệnh</text>
+  <text x="462" y="143" text-anchor="middle" class="n">↑ cảm biến trên robot, đọc liên tục</text>
+  <text x="744" y="143" text-anchor="middle" class="n">↑ đặt sẵn một lần, theo quy tắc cố định</text>
+  <text x="1023" y="143" text-anchor="middle" class="n">↑ người dùng chọn theo task</text>
+  <!-- Row 2: High-level policy -->
+  <rect x="45" y="160" width="530" height="176" rx="12" fill="#fff7f7" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="62" y="188" class="h">① High-level policy</text>
+  <text x="560" y="188" text-anchor="end" class="tag">SigLIP 400M + Gemma3 4B</text>
+  <text x="62" y="222" class="t">Vào:</text>
+  <rect x="102" y="206" width="60" height="24" rx="6" fill="#ccfbf1" stroke="#0f766e"/>
+  <text x="132" y="223" text-anchor="middle" class="c">o_t</text>
+  <rect x="170" y="206" width="190" height="24" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="265" y="223" text-anchor="middle" class="c">ℓ + lịch sử các subtask</text>
+  <rect x="368" y="206" width="50" height="24" rx="6" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="393" y="223" text-anchor="middle" class="c">m</text>
+  <text x="62" y="262" class="t">Ra:</text>
+  <rect x="102" y="246" width="316" height="24" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="260" y="263" text-anchor="middle" class="c">ℓ̂ = subtask kế tiếp: “pick up the knife”</text>
+  <text x="62" y="298" class="n">Chạy lại khi subtask hiện tại xong. Có thể thay bằng người nói</text>
+  <text x="62" y="316" class="n">từng bước (coaching); dữ liệu coaching dùng để fine-tune khối này.</text>
+
+  <!-- Row 2: World model -->
+  <rect x="625" y="160" width="530" height="176" rx="12" fill="#fffbeb" stroke="#b45309" stroke-width="1.5"/>
+  <text x="642" y="188" class="h">② World model (sinh ảnh subgoal)</text>
+  <text x="1140" y="188" text-anchor="end" class="tag">khởi tạo từ BAGEL 14B</text>
+  <text x="642" y="222" class="t">Vào:</text>
+  <rect x="682" y="206" width="110" height="24" rx="6" fill="#ccfbf1" stroke="#0f766e"/>
+  <text x="737" y="223" text-anchor="middle" class="c">o_t (3 view)</text>
+  <rect x="800" y="206" width="50" height="24" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="825" y="223" text-anchor="middle" class="c">ℓ̂</text>
+  <rect x="858" y="206" width="50" height="24" rx="6" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="883" y="223" text-anchor="middle" class="c">m</text>
+  <text x="642" y="262" class="t">Ra:</text>
+  <rect x="682" y="246" width="360" height="24" rx="6" fill="#fef3c7" stroke="#b45309"/>
+  <text x="862" y="263" text-anchor="middle" class="c">g* = ảnh tương lai gần, mỗi camera một ảnh</text>
+  <text x="642" y="298" class="n">Chạy lại khi ℓ̂ đổi hoặc sau Δ = 4 s. Khoảng 1.25 s/lần trên 4×H100</text>
+  <text x="642" y="316" class="n">(25 bước khử nhiễu, CFG theo text và ảnh). Có thể tắt hẳn.</text>
+
+  <!-- HLP -> WM -->
+  <path d="M575,258 L621,258" class="edge"/>
+  <text x="598" y="250" text-anchor="middle" class="el">ℓ̂</text>
+
+  <!-- Row 3: VLA -->
+  <rect x="45" y="386" width="1110" height="262" rx="12" fill="#f0f9ff" stroke="#0369a1" stroke-width="2"/>
+  <text x="62" y="414" class="h">③ π0.7 VLA (~5B tham số): sinh hành động</text>
+  <text x="1140" y="414" text-anchor="end" class="tag">chạy lại sau mỗi 15–25 bước điều khiển · 38–127 ms/lần trên 1×H100</text>
+
+  <!-- arrows into VLA -->
+  <path d="M310,336 L310,382" class="edge"/>
+  <text x="322" y="366" class="el">ℓ̂</text>
+  <path d="M890,336 L890,382" class="edge"/>
+  <text x="902" y="366" class="el">g*</text>
+
+  <text x="65" y="440" class="n">Context C_t, xếp đúng thứ tự trong chuỗi token (mỗi phần đều có thể bỏ trống):</text>
+  <rect x="65"  y="450" width="200" height="30" rx="6" fill="#ccfbf1" stroke="#0f766e"/>
+  <text x="165" y="470" text-anchor="middle" class="c">lịch sử ảnh, ≤6 khung/cam</text>
+  <rect x="273" y="450" width="150" height="30" rx="6" fill="#fef3c7" stroke="#b45309"/>
+  <text x="348" y="470" text-anchor="middle" class="c">ảnh subgoal g*</text>
+  <rect x="431" y="450" width="90" height="30" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="476" y="470" text-anchor="middle" class="c">task ℓ</text>
+  <rect x="529" y="450" width="110" height="30" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="584" y="470" text-anchor="middle" class="c">subtask ℓ̂</text>
+  <rect x="647" y="450" width="120" height="30" rx="6" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="707" y="470" text-anchor="middle" class="c">metadata m</text>
+  <rect x="775" y="450" width="90" height="30" rx="6" fill="#e2e8f0" stroke="#475569"/>
+  <text x="820" y="470" text-anchor="middle" class="c">mode c</text>
+  <rect x="873" y="450" width="130" height="30" rx="6" fill="#dcfce7" stroke="#15803d"/>
+  <text x="938" y="470" text-anchor="middle" class="c">q_t + lịch sử</text>
+
+  <!-- backbone -->
+  <rect x="65" y="498" width="690" height="132" rx="10" fill="#ffffff" stroke="#0369a1"/>
+  <text x="80" y="522" class="h" style="font-size:15px">VLM backbone: Gemma3 4B (gồm vision encoder SigLIP 400M)</text>
+  <text x="80" y="548" class="t">• Ảnh 448×448. MEM nén lịch sử mỗi camera còn số token bằng một khung.</text>
+  <text x="80" y="570" class="t">• Ảnh quan sát và subgoal: attention hai chiều. Phần text: causal.</text>
+  <text x="80" y="592" class="t">• q_t chiếu tuyến tính thành token (π0.6 rời rạc hoá thành text).</text>
+  <text x="80" y="614" class="t">• Học bằng token FAST + cross-entropy (knowledge insulation).</text>
+
+  <!-- action expert -->
+  <rect x="800" y="498" width="335" height="132" rx="10" fill="#ffffff" stroke="#ea580c"/>
+  <text x="815" y="522" class="h" style="font-size:15px">Action expert 860M</text>
+  <text x="815" y="548" class="t">• Flow matching, 5 bước khử nhiễu</text>
+  <text x="815" y="570" class="t">• 50 token hành động = chunk 50 bước</text>
+  <text x="815" y="592" class="t">• Đọc activation của backbone,</text>
+  <text x="827" y="614" class="t">gradient không chảy về backbone</text>
+
+  <path d="M755,564 L796,564" class="edge"/>
+  <text x="776" y="556" text-anchor="middle" class="n">K, V</text>
+
+  <!-- output -->
+  <path d="M967,630 L967,692" class="edge"/>
+  <rect x="45" y="696" width="1110" height="50" rx="10" fill="#ffedd5" stroke="#ea580c"/>
+  <text x="600" y="727" text-anchor="middle" class="t">chunk a_t..a_t+49 → chạy 15–25 bước đầu (async + RTC) → PD controller (qua IK nếu mode = ee) → robot 50 Hz (UR5e: 20 Hz)</text>
+
+  <!-- loop back -->
+  <path d="M45,721 L22,721 L22,108 L41,108" class="edge"/>
+  <text x="14" y="420" class="n" transform="rotate(-90 14 420)" text-anchor="middle">quan sát mới</text>
+
+  <!-- System 2 / System 1 brackets -->
+  <path d="M1170,160 L1182,160 L1182,336 L1170,336" fill="none" stroke="#9333ea" stroke-width="2.5"/>
+  <text x="1232" y="248" text-anchor="middle" transform="rotate(-90 1232 248)" style="font-size:16px;font-weight:700;fill:#9333ea">SYSTEM 2</text>
+  <text x="1256" y="248" text-anchor="middle" transform="rotate(-90 1256 248)" style="font-size:11.5px;fill:#6b21a8">chậm · nghĩ · vài giây</text>
+  <path d="M1170,386 L1182,386 L1182,746 L1170,746" fill="none" stroke="#0369a1" stroke-width="2.5"/>
+  <text x="1232" y="566" text-anchor="middle" transform="rotate(-90 1232 566)" style="font-size:16px;font-weight:700;fill:#0369a1">SYSTEM 1</text>
+  <text x="1256" y="566" text-anchor="middle" transform="rotate(-90 1256 566)" style="font-size:11.5px;fill:#075985">nhanh · phản xạ · hành động 50 Hz</text>
+</svg>

@@ -1,0 +1,30 @@
+<section id="fig5_4" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 5.4 · Ghép nối GR00T N1.7 với GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">24</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Nguồn của motion token</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Quy trình do NVIDIA đề xuất: lưu token SONIC dùng khi người điều khiển robot làm đáp án, rồi dạy GR00T đoán ra token đó</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Thu dữ liệu</b>: người đeo kính VR điều khiển; encoder teleop sinh token, token được ghi làm nhãn.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Fine-tune</b>: GR00T học đoán đúng token đó từ ảnh, câu lệnh và trạng thái.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Lúc chạy</b>: GR00T thay người và encoder; decoder g1_dyn giữ nguyên, nên nhãn phải dùng đúng checkpoint SONIC.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Do NVIDIA đề xuất</b>: bài báo SONIC fine-tune GR00T N1.5 theo cách này, đạt 75% trung bình trên 5 nhiệm vụ; tài liệu VLA của NVIDIA áp dụng cho GR00T N1.7.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/label_flow.svg" alt="Hình 5.4: Nguồn của motion token" style="width:1050px; height:331px; object-fit:contain">
+</div>
+<aside>GR00T được fine-tune trên các token ghi làm nhãn. Decoder SONIC giữ nguyên ở cả hai trường hợp. Quy trình do NVIDIA đề xuất (bài báo SONIC Mục 2.4–2.5, Phụ lục S1.4; tài liệu VLA Workflow của GR00T-WholeBodyControl); hình do nhóm vẽ lại. Việc tự tính nhãn cho dữ liệu mô phỏng là hướng mở rộng do nhóm đề xuất.</aside>
+</section>

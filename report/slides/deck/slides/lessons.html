@@ -1,0 +1,39 @@
+<section id="lessons" data-transition="fade" style="background:#173F2E; color:#BFD8CB; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 110px 120px; display:flex; flex-direction:column; gap:28px">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#102E21"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#1F5540"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:800px; text-align:right; font-size:24px; font-weight:700; color:#2DB36A; letter-spacing:1px; text-transform:uppercase">Bài học</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#FEFFFE"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#BFD8CB">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#F2F7F4">10</p>
+<h2 style="font-size:64px; font-weight:800; line-height:1.15; color:#F2F7F4; text-transform:uppercase">Bài học kinh nghiệm</h2>
+<div style="display:flex; flex-direction:row; gap:24px">
+<div style="flex:1; display:flex; flex-direction:column; gap:10px; background:#1F5540; border-radius:20px; padding:26px 28px">
+<p style="font-size:44px; font-weight:800; color:#2DB36A">01</p>
+<h3 style="font-size:32px; font-weight:700; line-height:1.25; color:#F2F7F4">Chất lượng demo quyết định trần của mô hình</h3>
+<p style="font-size:24px; line-height:1.4; color:#BFD8CB">Ban đầu bộ lập kế hoạch chỉ thu được 22/40 cảnh đổi phía, tay đi sát lon kia 1,2&nbsp;cm. Chừa khoảng hở, cố định kiểu gắp và lọc demo ngay lúc thu: C đạt 21/26 cảnh đổi phía (B: 10/26).</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:10px; background:#1F5540; border-radius:20px; padding:26px 28px">
+<p style="font-size:44px; font-weight:800; color:#2DB36A">02</p>
+<h3 style="font-size:32px; font-weight:700; line-height:1.25; color:#F2F7F4">Cấu hình chạy phải đi theo&nbsp;dữ&nbsp;liệu</h3>
+<p style="font-size:24px; line-height:1.4; color:#BFD8CB">Tập test cũ không ghi chế độ chân, nên C bị chạy với chân khoá cứng mà không có cảnh báo nào: 19/40. Chạy đúng chế độ tự giữ thăng bằng: 31/40. Nay chế độ chân ghi trong dữ liệu và eval tự đọc theo.</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:10px; background:#1F5540; border-radius:20px; padding:26px 28px">
+<p style="font-size:44px; font-weight:800; color:#2DB36A">03</p>
+<h3 style="font-size:32px; font-weight:700; line-height:1.25; color:#F2F7F4">Kiểm chứng cả cách&nbsp;chấm&nbsp;điểm</h3>
+<p style="font-size:24px; line-height:1.4; color:#BFD8CB">Lon nằm tự lăn 3&nbsp;cm trong 20&nbsp;s bị tính là robot xô lon; tỉ lệ thành công không tách được chọn nhầm lon với gắp hụt. Phải tráo màu hai lon mới chứng minh C chọn theo màu: đúng 40/40, tráo màu 0/40.</p>
+</div>
+</div>
+<div style="display:flex; flex-direction:row; gap:28px; align-items:center; background:#1F5540; border-left:8px solid #2DB36A; border-radius:20px; padding:22px 32px">
+<p style="font-size:44px; font-weight:800; color:#2DB36A">04</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:6px">
+<h3 style="font-size:32px; font-weight:700; line-height:1.25; color:#F2F7F4">Train trên Colab phải tính trước việc bị ngắt</h3>
+<p style="font-size:24px; line-height:1.4; color:#BFD8CB">Runtime ngắt ở bước 4.000. Checkpoint chỉ lưu trọng số nên không resume được; train tiếp từ bước 3.000 phải warmup lại, mất khoảng 1.200 bước để loss về mức cũ. Thư viện còn tự xoá checkpoint cũ, nên phải chép mọi checkpoint lên Drive ngay trong lúc train.</p>
+</div>
+</div>
+<aside>Bốn bài học rút từ khó khăn khi làm checkpoint C, mỗi thẻ gồm điều rút ra, bằng chứng và việc cần làm. Thẻ 01: ca đổi phía khó lập kế hoạch; nhóm sửa bộ lập kế hoạch (khoảng hở với lon kia, điểm chờ hạ thẳng từ trên, cho eo tham gia khi tay không với tới, một kiểu gắp cố định cho mỗi hướng lon nằm) và bỏ demo sát lon kia dưới 1 cm ngay lúc thu; khoảng hở trước kẹp trung vị từ 1,2 lên 3,8 cm, lon đứng đổi phía từ 0/4 lên 2/4. C còn khác B ở chế độ chân và cách train (batch 128, train tiếp), nên chưa tách được phần đóng góp riêng của chất lượng demo. Thẻ 02: tập test của B không có khoá chế độ chân nên eval mặc định khoá cứng, trong khi C học trên demo tự giữ thăng bằng; không lỗi nào báo ra. Thẻ 03: lon nằm tự lăn trung vị 3,1 cm sau 20 s; cảnh đã xong từng luôn được tính thành công; biến đổi ảnh (tráo kênh màu, ảnh xám) làm ảnh lạ nên không kết luận được, chỉ đổi màu thân lon trong mô phỏng mới tách được yếu tố màu. Thẻ 04: checkpoint lưu dạng chỉ trọng số, Isaac-GR00T không cho resume; finetune.sh giữ tối đa 5 checkpoint nên xoá bản cũ trong lúc train; notebook nay chép từng checkpoint lên Drive trong lúc train.</aside>
+</section>
