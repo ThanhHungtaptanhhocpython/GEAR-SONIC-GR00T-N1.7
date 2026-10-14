@@ -311,7 +311,7 @@ thanks = section("thanks", "padding:160px 128px 150px 128px; display:flex; flex-
 <div style="display:flex; flex-direction:row; gap:40px; align-items:center; background:#F1F8F4; border-radius:40px; padding:18px 44px">
 {pill("Users", "Nguyễn Duy Hoàng · Phạm Thanh Hưng")}
 <div style="width:2px; height:48px; background:#CFE3D7"></div>
-{pill("GraduationCap", "Mentor: Trần Ngọc Sơn")}
+{pill("GraduationCap", "Mentor: Trần Ngọc Sơn, Nguyễn Văn Thái")}
 </div>""", "Cảm ơn và mời đặt câu hỏi.")
 
 for name, html in [("gr00t", gr00t), ("gr00tdata", gr00tdata), ("compare", compare), ("sonic", sonic), ("roadmap", roadmap), ("thanks", thanks)]:

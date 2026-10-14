@@ -1,0 +1,30 @@
+<section id="fig1_1" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 1.1 · Tổng quan GR00T N1.7 và GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">02</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Kiến trúc GR00T N1.7</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">System 2 (VLM) hiểu ảnh và câu lệnh; System 1 (action head DiT) sinh chunk 40 bước hành động</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>System 2</b>: VLM Cosmos-Reason2-2B đổi ảnh và câu lệnh thành 116 token (96 ảnh, 13 chữ, 7 định dạng); đóng băng khi fine-tune.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>System 1</b>: trạng thái thành 1 token, 40 bước hành động có nhiễu thành 40 token; DiT 16 khối xen kẽ tự chú ý và chú ý chéo tới token VLM.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Khử nhiễu 4 lần, ra chunk 40 bước; mỗi bước 78 số: 64 token SONIC + 14 góc ngón tay.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Khối xanh lá có trọng số riêng cho từng embodiment và được fine-tune.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/gr00t_arch.svg" alt="Hình 1.1: Kiến trúc GR00T N1.7" style="width:1050px; height:496px; object-fit:contain">
+</div>
+<aside>Khối VLM Cosmos-Reason2-2B, kiến trúc Qwen3-VL, đóng băng khi fine-tune: ảnh chia thành ô 32 × 32 điểm ảnh, ảnh 384 × 256 của nhóm cho 96 token; câu lệnh mẫu cho 13 token chữ, cộng 7 token định dạng, tổng 116 token; GR00T chỉ giữ 12 lớp đầu của mô hình ngôn ngữ, mỗi token 2048 chiều. Action head khử nhiễu 4 lần: trạng thái thành 1 token, 40 bước hành động thành 40 token, qua 16 khối DiT xen kẽ tự chú ý và chú ý chéo tới token chữ, token ảnh; bộ giải mã đổi mỗi token thành một bước, 78 số mỗi bước. Các khối màu xanh lá có trọng số riêng cho từng embodiment và được fine-tune.</aside>
+</section>

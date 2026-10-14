@@ -1,0 +1,30 @@
+<section id="fig3_2" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 3.2 · Tiền xử lý dữ liệu huấn luyện SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">15</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Chuẩn bị Bones-SEED để fine-tune SONIC</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Phần robot do nhóm thực hiện tự chuyển định dạng và lọc; phần người NVIDIA đã xử lý sẵn</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Phần robot, nhóm tự làm</b>: chuyển 142.220 tệp CSV sang motion library, hạ 120 xuống 30 khung/giây.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Lọc 40 từ khoá</b> (leo cầu thang, ngồi, ghế…): còn 129.785 clip, 264,5 giờ.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Phần người</b>: tải bản SMPL NVIDIA phát hành, khoảng 30 GB, khoảng 131 nghìn tệp.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Bước 4</b>: ghép robot với người theo tên clip, fine-tune từ checkpoint phát hành.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/seed_prep.svg" alt="Hình 3.2: Chuẩn bị Bones-SEED để fine-tune SONIC" style="width:1050px; height:526px; object-fit:contain">
+</div>
+<aside>Khác với bộ 700 giờ, phần lớn việc tiền xử lý Bones-SEED đã được làm trước khi phát hành, nên nhóm thực hiện chỉ cần bốn bước. Hàng trên là phần robot, do nhóm tự xử lý. Bước 1 chuyển 142.220 tệp CSV chuyển động robot G1 sang định dạng motion library mà SONIC đọc được, đồng thời hạ tần số từ 120 xuống 30 khung mỗi giây; kết quả là 142.220 tệp PKL. Ở bước này cần khai báo đúng tần số nguồn 120 khung mỗi giây; nếu khai báo sai, chuyển động bị chậm đi 2,4 lần mà công cụ chuyển đổi không đưa ra cảnh báo. Bước 2 loại các clip robot không làm được bằng cách so tên tệp với 40 từ khoá, như leo cầu thang, ngồi hay ghế; còn lại 129.785 clip, tương đương 264,5 giờ. Hàng dưới là phần người: NVIDIA đã chuyển sẵn các clip sang dạng SMPL, nên ở bước 3 chỉ cần tải khoảng 30 GB từ Hugging Face và giải nén, được khoảng 131 nghìn tệp. Ở bước 4, mỗi clip robot được ghép với dữ liệu người có cùng tên clip để fine-tune SONIC từ checkpoint phát hành. Clip robot không có dữ liệu người tương ứng vẫn được dùng, nhưng phần dữ liệu người được điền bằng 0.</aside>
+</section>

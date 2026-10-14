@@ -38,3 +38,18 @@ Cần Edge hoặc Chrome và kết nối mạng để tải font Be Vietnam Pro.
 pip install mujoco imageio imageio-ffmpeg pandas matplotlib pillow
 python report/slides/tools/make_figures.py
 ```
+
+## Bộ slide hình TikZ
+
+Bộ slide riêng gồm 14 hình TikZ của báo cáo (Hình 1.1–1.3, 3.1–3.3, 4.1–4.4, 5.1–5.4) và phần thống kê Bones-SEED
+(slide tổng quan số liệu + 7 biểu đồ Hình 2.1–2.3, A.1–A.4, đặt ngay sau các hình Chương 1), cùng mẫu trình bày với bộ chính.
+Thư mục `deck_tikz/` do `gen_tikz.py` sinh ra, không sửa tay; đổi tiêu đề, phụ đề hoặc phần giải thích thì sửa `FIGS`, `EXPLAIN`, `STATS`, `OVERVIEW` trong script. Mọi slide hình TikZ để giải thích ở cột trái, hình bên phải.
+Biểu đồ thống kê lấy thẳng từ `report/figures/bones_seed/*.png` (đường dẫn `/_fig/...`), nên vẽ lại biểu đồ thì chỉ cần chạy lại hai lệnh cuối.
+
+```bash
+report/slides/tools/extract_tikz.sh   # tách hình từ Nvidia_groot.tex ra assets/tikz/*.svg (build report trước)
+python report/slides/gen_tikz.py      # ghi deck_tikz/deck.json và deck_tikz/slides/*.html
+python report/slides/build_pdf.py --deck deck_tikz --out Slides_Hinh_TikZ_GR00T_SONIC.pdf
+```
+
+Sửa hình trong báo cáo thì chạy lại cả ba lệnh. Ảnh trong slide trỏ `/_asset/<đường dẫn trong assets/>`, `build_pdf.py` tự đổi sang file cục bộ.

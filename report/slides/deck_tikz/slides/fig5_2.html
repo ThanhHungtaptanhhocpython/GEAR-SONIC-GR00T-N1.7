@@ -1,0 +1,30 @@
+<section id="fig5_2" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 5.2 · Ghép nối GR00T N1.7 với GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">22</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Luồng chạy chi tiết</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Các luồng, tần số và cổng ZMQ giữa máy GPU, client Python và robot</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Máy GPU</b>: GR00T server, ≤2,5 Hz, trả về chunk 40 bước.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Client Python</b>: luồng suy luận giữ chunk mới nhất; vòng chính bù trễ, gửi một bước mỗi 20 ms.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53"><b>Robot G1</b>: decoder SONIC chạy 50 Hz, ghi lệnh 500 Hz cho 29 động cơ thân; Dex3 nhận góc tay.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Nét đứt: trạng thái robot gửi ngược về client.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/runtime_detail.svg" alt="Hình 5.2: Luồng chạy chi tiết" style="width:807px; height:704px; object-fit:contain">
+</div>
+<aside>Theo mã nguồn client và chương trình triển khai của NVIDIA. Camera server chạy trên robot, vẽ tách riêng cho dễ theo dõi.</aside>
+</section>

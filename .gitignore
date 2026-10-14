@@ -25,3 +25,18 @@ report/*.fls
 report/*.synctex.gz
 report/*.docx
 report/*.pdf
+
+# Ngoài phạm vi project: CV cá nhân, cấu hình editor
+cv/
+.vscode/
+
+# Paper tham khảo (PDF tải về) ở thư mục gốc và PI/
+/*.pdf
+PI/*.pdf
+
+# Bản sao notebook Colab tải về và bản backup report
+colab_gr00t_finetune (*).ipynb
+report/*_backup_*.tex
+
+# Metadata Bones-SEED tải từ Hugging Face (đầu vào của tools/plot_bones_seed_metadata.py)
+seed_metadata_v004.parquet

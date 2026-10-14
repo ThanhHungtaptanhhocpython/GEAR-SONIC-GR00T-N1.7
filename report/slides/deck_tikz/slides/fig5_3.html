@@ -1,0 +1,29 @@
+<section id="fig5_3" data-transition="fade" style="background:#F3F8F5; color:#4B5B53; font-family:'Be Vietnam Pro', Arial, sans-serif; padding:200px 128px 116px 120px; display:flex; flex-direction:row; gap:48px; align-items:start">
+<div style="position:absolute; left:0; top:0; width:1920px; height:28px; background:#1A4A35"></div>
+<div style="position:absolute; left:0; top:28px; width:1920px; height:10px; background:#2DB36A"></div>
+<div style="position:absolute; left:0; top:38px; width:56px; height:1042px; background:#E3F0E8"></div>
+<div style="position:absolute; left:56px; top:38px; width:7px; height:1042px; background:#2DB36A"></div>
+<div style="position:absolute; left:112px; top:62px; width:216px; height:118px; background:#FEFFFE; border-radius:14px"></div>
+<img src="/_blob/199565b59f8ae0c9c6658b583fbd6750" alt="VinDynamics" style="position:absolute; left:120px; top:66px; width:200px; height:110px; object-fit:contain">
+<p style="position:absolute; right:128px; top:100px; width:900px; text-align:right; font-size:24px; font-weight:700; color:#1C8A4B; letter-spacing:1px; text-transform:uppercase">Hình 5.3 · Ghép nối GR00T N1.7 với GEAR-SONIC</p>
+<div style="position:absolute; left:120px; top:984px; width:320px; height:12px; background:#2DB36A"></div>
+<div style="position:absolute; left:456px; top:984px; width:110px; height:12px; background:#1A4A35"></div>
+<p style="position:absolute; left:120px; bottom:24px; width:600px; font-size:24px; color:#6E7C75">VinDynamics  |  Confidential</p>
+<p style="position:absolute; right:128px; bottom:24px; width:200px; text-align:right; font-size:32px; font-weight:700; color:#173F2E">23</p>
+<div style="flex:1; display:flex; flex-direction:column; gap:26px">
+<div style="display:flex; flex-direction:column; gap:12px">
+<h2 style="font-size:46px; font-weight:800; line-height:1.15; color:#173F2E; text-transform:uppercase">Dòng thời gian của client, độ trễ Δ = 0,1 s</h2>
+<p style="font-size:26px; line-height:1.4; color:#5D6B64">Client gọi lần mới 0,4 s sau khi nhận chunk, nên hai lần gọi cách nhau 0,5 s</p>
+</div>
+<div style="width:120px; height:6px; border-radius:3px; background:#2DB36A"></div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Ví dụ độ trễ Δ = 0,1 s: client gọi GR00T, 0,1 s sau mới nhận chunk A.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Chunk đã cũ 0,1 s, tức 5 bước, nên client gửi từ A[5]; gọi lại 0,4 s sau khi nhận, nên hai lần gọi cách 0,5 s.</p></div>
+<div style="display:flex; flex-direction:row; gap:14px; align-items:start"><div style="width:12px; height:12px; margin-top:11px; border-radius:3px; background:#2DB36A; flex:none"></div><p style="font-size:23px; line-height:1.4; color:#4B5B53">Chunk B về thì chuyển ngay sang B[5]; bước 30–39 của A không bao giờ được gửi. Với cấu hình mặc định, Δ cần dưới khoảng 0,2 s.</p></div>
+</div>
+</div>
+<div style="width:1100px; height:754px; background:#FEFFFE; border:1px solid #E2E9E5; border-radius:24px; padding:24px; display:flex; align-items:center; justify-content:center; flex:none">
+<img src="/_asset/tikz/timeline.svg" alt="Hình 5.3: Dòng thời gian của client, độ trễ Δ = 0,1 s" style="width:1050px; height:287px; object-fit:contain">
+</div>
+<aside>Khi nhận chunk mới, client thay ngay chunk cũ và bắt đầu từ bước 5; các bước 30 đến 39 của chunk A không bao giờ được gửi.</aside>
+</section>

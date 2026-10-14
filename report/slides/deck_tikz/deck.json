@@ -1,0 +1,37 @@
+{
+  "v": 4,
+  "title": "Hình TikZ: Bones-SEED, GEAR-SONIC và GR00T N1.7",
+  "order": [
+    "cover",
+    "fig1_1",
+    "fig1_2",
+    "fig1_3",
+    "mb_video",
+    "bones_overview",
+    "fig2_1",
+    "figA_1",
+    "fig2_2",
+    "fig2_3",
+    "figA_2",
+    "figA_3",
+    "figA_4",
+    "fig3_1",
+    "fig3_2",
+    "fig3_3",
+    "fig4_1",
+    "fig4_2",
+    "fig4_3",
+    "fig4_4",
+    "fig5_1",
+    "fig5_2",
+    "fig5_3",
+    "fig5_4",
+    "thanks"
+  ],
+  "faces": {
+    "be-vietnam-pro": {
+      "family": "Be Vietnam Pro",
+      "href": "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap"
+    }
+  }
+}

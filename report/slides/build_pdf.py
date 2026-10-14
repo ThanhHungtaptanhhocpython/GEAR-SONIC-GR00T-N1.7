@@ -6,6 +6,8 @@ rồi in bằng Edge hoặc Chrome chạy headless.
 Dùng:
     python report/slides/build_pdf.py              -> report/Slides_GR00T_N1.7_SONIC.pdf
     python report/slides/build_pdf.py --html-only  -> chỉ tạo build/deck_print.html để xem trên trình duyệt
+    python report/slides/build_pdf.py --deck deck_tikz --out Slides_Hinh_TikZ.pdf
+                                                   -> in bộ slide khác (thư mục trong slides/, PDF đặt trong report/)
 """
 import json
 import pathlib
@@ -20,6 +22,16 @@ ASSETS = HERE / "assets"
 FIG = HERE.parent / "figures"
 BUILD = HERE / "build"
 PDF_OUT = HERE.parent / "Slides_GR00T_N1.7_SONIC.pdf"
+
+
+def _arg(name):
+    return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else None
+
+
+if _arg("--deck"):
+    DECK = HERE / _arg("--deck")
+if _arg("--out"):
+    PDF_OUT = HERE.parent / _arg("--out")
 
 # Slide trên web tham chiếu ảnh bằng id trong kho asset (/_blob/<id>); khi in cục bộ thay bằng file tương ứng.
 BLOBS = {
@@ -109,6 +121,8 @@ def build_html():
         h = (DECK / f"slides/{sid}.html").read_text(encoding="utf-8")
         h = re.sub(r"<aside>.*?</aside>", "", h, flags=re.S)  # bỏ ghi chú thuyết trình
         h = re.sub(r"/_blob/([0-9a-f]{32})", lambda m: BLOBS[m.group(1)].as_uri(), h)
+        h = re.sub(r"/_asset/([\w./-]+)", lambda m: (ASSETS / m.group(1)).as_uri(), h)  # file trong assets/
+        h = re.sub(r"/_fig/([\w./-]+)", lambda m: (FIG / m.group(1)).as_uri(), h)  # file trong report/figures/
         h = re.sub(r'<x-shape kind="arrow-right" style="([^"]*)"></x-shape>', _arrow, h)
         h = re.sub(r'<x-icon name="(\w+)" style="([^"]*)"></x-icon>', _icon, h)
         parts.append(h)
@@ -116,7 +130,7 @@ def build_html():
     html = (f'<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>{deck["title"]}</title>\n'
             f'<link rel="stylesheet" href="{font}"><style>{CSS}</style></head><body>\n{"".join(parts)}</body></html>')
     BUILD.mkdir(exist_ok=True)
-    path = BUILD / "deck_print.html"
+    path = BUILD / f"{DECK.name}_print.html"
     path.write_text(html, encoding="utf-8")
     return path, len(deck["order"])
 
